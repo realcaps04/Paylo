@@ -156,27 +156,11 @@ export function LoginPage() {
         <div className="pointer-events-none absolute left-1/2 top-40 h-48 w-48 -translate-x-1/2 rounded-full border border-white/15" />
         <div className="pointer-events-none absolute right-8 top-52 h-28 w-28 rounded-full border border-white/10" />
 
-        <div className="relative z-10 flex items-center justify-end">
-          <button
-            type="button"
-            className="rounded-full px-2 py-1 text-sm font-medium text-white/90 hover:bg-white/10"
-            onClick={() =>
-              window.alert(
-                googleReady
-                  ? 'Use Continue with Google to sign in or create your shop. Allow popups if prompted.'
-                  : 'Add VITE_GOOGLE_CLIENT_ID to .env and restart the dev server.',
-              )
-            }
-          >
-            Help?
-          </button>
-        </div>
-
         <motion.div
           initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4 }}
-          className="relative z-10 mx-auto mt-6 flex w-full max-w-md flex-1 flex-col items-center text-center"
+          className="relative z-10 mx-auto mt-10 flex w-full max-w-md flex-1 flex-col items-center text-center"
         >
           <LogoMark
             size="xl"

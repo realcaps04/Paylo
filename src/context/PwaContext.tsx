@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react'
@@ -27,9 +28,13 @@ interface PwaContextValue {
   updateApp: () => void
   showInstallHint: boolean
   setShowInstallHint: (v: boolean) => void
+  checkForUpdate: () => Promise<void>
 }
 
 const PwaContext = createContext<PwaContextValue | null>(null)
+
+/** How often to poll for a new service worker while the app stays open */
+const UPDATE_POLL_MS = 60_000
 
 function detectPlatform(): PwaContextValue['platform'] {
   const ua = navigator.userAgent.toLowerCase()
@@ -54,17 +59,62 @@ export function PwaProvider({ children }: { children: ReactNode }) {
     loadJSON('install_dismissed', false),
   )
   const [showInstallHint, setShowInstallHint] = useState(false)
+  const registrationRef = useRef<ServiceWorkerRegistration | null>(null)
   const platform = useMemo(detectPlatform, [])
 
   const {
-    needRefresh: [needRefresh],
+    needRefresh: [needRefresh, setNeedRefresh],
     offlineReady: [offlineReady],
     updateServiceWorker,
   } = useRegisterSW({
-    onRegisteredSW() {
-      // registered
+    immediate: true,
+    onRegisteredSW(_swUrl, registration) {
+      if (registration) {
+        registrationRef.current = registration
+      }
+    },
+    onNeedRefresh() {
+      setNeedRefresh(true)
     },
   })
+
+  const checkForUpdate = useCallback(async () => {
+    const reg = registrationRef.current
+    if (!reg) return
+    try {
+      await reg.update()
+      if (reg.waiting) {
+        setNeedRefresh(true)
+      }
+    } catch {
+      // ignore network errors while offline
+    }
+  }, [setNeedRefresh])
+
+  // Poll for updates while the app remains open
+  useEffect(() => {
+    void checkForUpdate()
+    const id = window.setInterval(() => {
+      void checkForUpdate()
+    }, UPDATE_POLL_MS)
+    return () => window.clearInterval(id)
+  }, [checkForUpdate])
+
+  // Recheck when the tab becomes visible / connection returns
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void checkForUpdate()
+    }
+    const onOnline = () => void checkForUpdate()
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('online', onOnline)
+    window.addEventListener('focus', onVisible)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('online', onOnline)
+      window.removeEventListener('focus', onVisible)
+    }
+  }, [checkForUpdate])
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -79,6 +129,16 @@ export function PwaProvider({ children }: { children: ReactNode }) {
     })
     return () => window.removeEventListener('beforeinstallprompt', handler)
   }, [])
+
+  // Lock background scroll when mandatory update is shown
+  useEffect(() => {
+    if (!needRefresh) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = prev
+    }
+  }, [needRefresh])
 
   const promptInstall = useCallback(async () => {
     if (deferred) {
@@ -96,6 +156,10 @@ export function PwaProvider({ children }: { children: ReactNode }) {
     setShowInstallHint(false)
   }, [])
 
+  const updateApp = useCallback(() => {
+    void updateServiceWorker(true)
+  }, [updateServiceWorker])
+
   const value: PwaContextValue = {
     canInstall: !!deferred && !isInstalled,
     isInstalled,
@@ -105,9 +169,10 @@ export function PwaProvider({ children }: { children: ReactNode }) {
     platform,
     promptInstall,
     dismissInstall,
-    updateApp: () => updateServiceWorker(true),
+    updateApp,
     showInstallHint,
     setShowInstallHint,
+    checkForUpdate,
   }
 
   return <PwaContext.Provider value={value}>{children}</PwaContext.Provider>

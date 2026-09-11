@@ -5,6 +5,7 @@ import { ToastProvider } from '@/context/ToastContext'
 import { PwaProvider } from '@/context/PwaContext'
 import { AppShell } from '@/components/layout/AppShell'
 import { InstallPrompt } from '@/components/pwa/InstallPrompt'
+import { MandatoryUpdateModal } from '@/components/pwa/MandatoryUpdateModal'
 import { LoginPage } from '@/pages/LoginPage'
 import { OnboardingWizard } from '@/pages/onboarding/OnboardingWizard'
 import { DashboardPage } from '@/pages/DashboardPage'
@@ -252,6 +253,7 @@ export default function App() {
             <PwaProvider>
               <AppRoutes />
               <InstallPrompt />
+              <MandatoryUpdateModal />
             </PwaProvider>
           </ToastProvider>
         </ShopProvider>

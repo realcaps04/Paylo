@@ -62,7 +62,7 @@ function mobileOwnerNav() {
 export function AppShell({ children }: { children: ReactNode }) {
   const { session, setActiveShop } = useAuth()
   const { shop, store, notifications, online, syncing } = useShop()
-  const { canInstall, promptInstall, needRefresh, updateApp } = usePwa()
+  const { canInstall, promptInstall } = usePwa()
   const navigate = useNavigate()
   const [shopOpen, setShopOpen] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
@@ -85,18 +85,6 @@ export function AppShell({ children }: { children: ReactNode }) {
       {online && syncing && (
         <div className="bg-brand-600 px-4 py-2 text-center text-sm font-medium text-white">
           Back online — syncing…
-        </div>
-      )}
-      {needRefresh && (
-        <div className="flex items-center justify-center gap-3 bg-ink px-4 py-2 text-sm text-white">
-          New version available
-          <button
-            type="button"
-            onClick={updateApp}
-            className="rounded-md bg-white/15 px-2.5 py-1 font-semibold hover:bg-white/25"
-          >
-            Update Now
-          </button>
         </div>
       )}
 
