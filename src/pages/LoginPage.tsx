@@ -310,26 +310,24 @@ export function LoginPage() {
             initial={{ opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1, duration: 0.45, ease: 'easeOut' }}
-            className="relative flex min-h-[148px] items-center"
+            className="relative flex min-h-[160px] items-start"
           >
-            <div className="relative z-20 pr-1">
-              <h1 className="font-display text-[23px] font-extrabold leading-[1.22] tracking-[-0.02em] text-[#0f1a33]">
-                <span className="block whitespace-nowrap">Smarter Payments for</span>
-                <span className="block whitespace-nowrap text-[#0064f0]">Growing Shops</span>
+            <div className="relative z-10 w-[54%] max-w-[210px] pr-2">
+              <h1 className="font-display text-[22px] font-extrabold leading-[1.28] tracking-[-0.02em] text-[#0f1a33]">
+                <span className="block">Smarter Payments for</span>
+                <span className="mt-0.5 block text-[#0064f0]">Growing Shops</span>
               </h1>
-              <p className="mt-5 text-[12.5px] leading-[1.5] text-slate-500">
-                <span className="block whitespace-nowrap">
-                  Accept payments, track sales and manage your shop —
-                </span>
-                <span className="block whitespace-nowrap">all in one simple app.</span>
+              <p className="mt-7 text-[12.5px] leading-[1.55] text-slate-500">
+                <span className="block">Accept payments, track sales</span>
+                <span className="block">and manage your shop — all in one simple app.</span>
               </p>
             </div>
             <motion.div
               animate={{ y: [0, -6, 0] }}
               transition={{ duration: 5.5, repeat: Infinity, ease: 'easeInOut' }}
-              className="pointer-events-none absolute -right-4 top-0 z-10 w-[52%] max-w-[200px]"
+              className="pointer-events-none absolute -right-3 top-0 z-20 w-[50%] max-w-[200px]"
             >
-              <ShopScene className="h-auto w-full" />
+              <ShopScene className="h-auto w-full drop-shadow-sm" />
             </motion.div>
           </motion.div>
 
