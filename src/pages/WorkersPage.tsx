@@ -54,6 +54,10 @@ export function WorkersPage() {
   const [createdCode, setCreatedCode] = useState<{ name: string; code: string } | null>(null)
   const [copied, setCopied] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [confirm, setConfirm] = useState<
+    | { type: 'deactivate' | 'activate' | 'remove'; worker: Worker }
+    | null
+  >(null)
 
   const ownerEmail = (shop?.email || session?.user.email || '').trim().toLowerCase()
   const team = workers.filter((w) => {
@@ -105,6 +109,22 @@ export function WorkersPage() {
       role: w.role === 'owner' ? 'manager' : w.role,
     })
     setOpen(true)
+  }
+
+  const runConfirm = () => {
+    if (!confirm) return
+    const { type, worker } = confirm
+    if (type === 'remove') {
+      removeWorker(worker.id)
+      toast('Staff removed')
+    } else if (type === 'deactivate') {
+      updateWorker(worker.id, { active: false })
+      toast('Staff deactivated')
+    } else {
+      updateWorker(worker.id, { active: true })
+      toast('Staff activated')
+    }
+    setConfirm(null)
   }
 
   const copyCode = async (code: string) => {
@@ -299,10 +319,12 @@ export function WorkersPage() {
                     <Button
                       size="sm"
                       variant="secondary"
-                      onClick={() => {
-                        updateWorker(w.id, { active: !w.active })
-                        toast(w.active ? 'Staff deactivated' : 'Staff activated')
-                      }}
+                      onClick={() =>
+                        setConfirm({
+                          type: w.active ? 'deactivate' : 'activate',
+                          worker: w,
+                        })
+                      }
                     >
                       {w.active ? 'Deactivate' : 'Activate'}
                     </Button>
@@ -311,10 +333,7 @@ export function WorkersPage() {
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() => {
-                        removeWorker(w.id)
-                        toast('Staff removed')
-                      }}
+                      onClick={() => setConfirm({ type: 'remove', worker: w })}
                     >
                       Remove
                     </Button>
@@ -358,6 +377,60 @@ export function WorkersPage() {
             </Select>
           </Field>
         </div>
+      </Modal>
+
+      <Modal
+        open={Boolean(confirm)}
+        onClose={() => setConfirm(null)}
+        title={
+          confirm?.type === 'remove'
+            ? 'Remove staff?'
+            : confirm?.type === 'deactivate'
+              ? 'Deactivate staff?'
+              : 'Activate staff?'
+        }
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setConfirm(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant={confirm?.type === 'remove' ? 'danger' : 'primary'}
+              onClick={runConfirm}
+            >
+              {confirm?.type === 'remove'
+                ? 'Remove'
+                : confirm?.type === 'deactivate'
+                  ? 'Deactivate'
+                  : 'Activate'}
+            </Button>
+          </>
+        }
+      >
+        {confirm && (
+          <p className="text-sm text-ink-muted">
+            {confirm.type === 'remove' && (
+              <>
+                Are you sure you want to remove{' '}
+                <span className="font-semibold text-ink">{confirm.worker.name}</span>? This
+                cannot be undone.
+              </>
+            )}
+            {confirm.type === 'deactivate' && (
+              <>
+                Are you sure you want to deactivate{' '}
+                <span className="font-semibold text-ink">{confirm.worker.name}</span>? They
+                won&apos;t be able to log work until activated again.
+              </>
+            )}
+            {confirm.type === 'activate' && (
+              <>
+                Activate <span className="font-semibold text-ink">{confirm.worker.name}</span>{' '}
+                so they can access the shop again?
+              </>
+            )}
+          </p>
+        )}
       </Modal>
 
       <Modal
