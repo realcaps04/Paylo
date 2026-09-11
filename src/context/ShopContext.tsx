@@ -7,7 +7,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { createDemoStore, createEmptyStore } from '@/data/demo'
+import { createEmptyStore } from '@/data/demo'
 import { computePaymentStatus } from '@/lib/permissions'
 import { uid } from '@/lib/format'
 import { loadJSON, saveJSON } from '@/lib/storage'
@@ -51,7 +51,6 @@ interface ShopContextValue {
   online: boolean
   syncing: boolean
   pendingSyncCount: number
-  seedDemo: () => void
   resetStore: () => void
   addShop: (shop: Shop) => void
   updateShop: (id: string, patch: Partial<Shop>) => void
@@ -85,17 +84,32 @@ interface ShopContextValue {
 
 const ShopContext = createContext<ShopContextValue | null>(null)
 
-function hydrateStore(hasDemoSession: boolean): ShopStore {
+/** Legacy demo shop ids from earlier builds — strip so only real shops remain. */
+const DEMO_SHOP_IDS = new Set(['shop_main', 'shop_barber'])
+
+function stripDemoData(store: ShopStore): ShopStore {
+  const shops = store.shops.filter((s) => !DEMO_SHOP_IDS.has(s.id))
+  const keep = (shopId: string) => !DEMO_SHOP_IDS.has(shopId)
+  return {
+    shops,
+    workers: store.workers.filter((w) => keep(w.shopId)),
+    customers: store.customers.filter((c) => keep(c.shopId)),
+    services: store.services.filter((s) => keep(s.shopId)),
+    workRecords: store.workRecords.filter((w) => keep(w.shopId)),
+    payments: store.payments.filter((p) => keep(p.shopId)),
+    notifications: store.notifications.filter((n) => keep(n.shopId)),
+  }
+}
+
+function hydrateStore(): ShopStore {
   const saved = loadJSON<ShopStore | null>('store', null)
-  if (saved) return saved
-  return hasDemoSession ? createDemoStore() : createEmptyStore()
+  if (!saved) return createEmptyStore()
+  return stripDemoData(saved)
 }
 
 export function ShopProvider({ children }: { children: ReactNode }) {
   const { session } = useAuth()
-  const [store, setStore] = useState<ShopStore>(() =>
-    hydrateStore(true),
-  )
+  const [store, setStore] = useState<ShopStore>(() => hydrateStore())
   const [online, setOnline] = useState(navigator.onLine)
   const [syncing, setSyncing] = useState(false)
 
@@ -158,11 +172,18 @@ export function ShopProvider({ children }: { children: ReactNode }) {
     setStore(updater)
   }, [])
 
-  const seedDemo = useCallback(() => setStore(createDemoStore()), [])
   const resetStore = useCallback(() => setStore(createEmptyStore()), [])
 
   const addShop = useCallback((s: Shop) => {
-    patchStore((prev) => ({ ...prev, shops: [...prev.shops, s] }))
+    patchStore((prev) => {
+      if (prev.shops.some((x) => x.id === s.id)) {
+        return {
+          ...prev,
+          shops: prev.shops.map((x) => (x.id === s.id ? { ...x, ...s } : x)),
+        }
+      }
+      return { ...prev, shops: [...prev.shops, s] }
+    })
   }, [patchStore])
 
   const updateShop = useCallback((id: string, patch: Partial<Shop>) => {
@@ -472,7 +493,6 @@ export function ShopProvider({ children }: { children: ReactNode }) {
     online,
     syncing,
     pendingSyncCount,
-    seedDemo,
     resetStore,
     addShop,
     updateShop,

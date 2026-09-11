@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react'
 import { ClipboardList, ListFilter, X } from 'lucide-react'
 import { useShop } from '@/context/ShopContext'
 import {
-  Badge,
   Button,
   Card,
   EmptyState,
@@ -10,11 +9,11 @@ import {
   Modal,
   PageHeader,
   Select,
-  paymentTone,
 } from '@/components/ui'
 import { formatINR, formatDate } from '@/lib/format'
 import { filterByDateRange } from '@/lib/permissions'
 import { cn } from '@/lib/cn'
+import type { PaymentMethod } from '@/types'
 
 const DATE_LABELS: Record<string, string> = {
   today: 'Today',
@@ -25,31 +24,36 @@ const DATE_LABELS: Record<string, string> = {
   '3m': 'Last 3 months',
 }
 
+const METHOD_LABELS: Record<string, string> = {
+  upi: 'UPI',
+  cash: 'Cash',
+  card: 'Card',
+  bank: 'Bank transfer',
+  other: 'Other',
+}
+
 type Filters = {
   datePreset: string
   workerId: string
-  status: string
-  serviceId: string
+  paymentMethod: string
 }
 
 const DEFAULT_FILTERS: Filters = {
   datePreset: '30d',
   workerId: 'all',
-  status: 'all',
-  serviceId: 'all',
+  paymentMethod: 'all',
 }
 
 function countActiveFilters(f: Filters) {
   let n = 0
   if (f.datePreset !== DEFAULT_FILTERS.datePreset) n += 1
   if (f.workerId !== 'all') n += 1
-  if (f.status !== 'all') n += 1
-  if (f.serviceId !== 'all') n += 1
+  if (f.paymentMethod !== 'all') n += 1
   return n
 }
 
 export function TransactionsPage() {
-  const { workRecords, workers, services } = useShop()
+  const { workRecords, workers } = useShop()
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS)
   const [draft, setDraft] = useState<Filters>(DEFAULT_FILTERS)
   const [filterOpen, setFilterOpen] = useState(false)
@@ -57,8 +61,9 @@ export function TransactionsPage() {
   const filtered = useMemo(() => {
     let list = filterByDateRange(workRecords, filters.datePreset)
     if (filters.workerId !== 'all') list = list.filter((r) => r.workerId === filters.workerId)
-    if (filters.status !== 'all') list = list.filter((r) => r.paymentStatus === filters.status)
-    if (filters.serviceId !== 'all') list = list.filter((r) => r.serviceId === filters.serviceId)
+    if (filters.paymentMethod !== 'all') {
+      list = list.filter((r) => (r.paymentMethod ?? 'other') === filters.paymentMethod)
+    }
     return [...list].sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     )
@@ -92,16 +97,10 @@ export function TransactionsPage() {
   if (filters.workerId !== 'all') {
     chips.push({ key: 'workerId', label: workerName(filters.workerId) })
   }
-  if (filters.status !== 'all') {
+  if (filters.paymentMethod !== 'all') {
     chips.push({
-      key: 'status',
-      label: filters.status.charAt(0).toUpperCase() + filters.status.slice(1),
-    })
-  }
-  if (filters.serviceId !== 'all') {
-    chips.push({
-      key: 'serviceId',
-      label: services.find((s) => s.id === filters.serviceId)?.name ?? 'Service',
+      key: 'paymentMethod',
+      label: METHOD_LABELS[filters.paymentMethod] ?? filters.paymentMethod,
     })
   }
 
@@ -191,13 +190,13 @@ export function TransactionsPage() {
                   <p className="truncate text-sm font-semibold text-[#0f1a33]">{r.customerName}</p>
                   <p className="truncate text-xs text-slate-500">
                     {formatDate(r.createdAt)} · {workerName(r.workerId)}
+                    {r.paymentMethod
+                      ? ` · ${METHOD_LABELS[r.paymentMethod] ?? r.paymentMethod}`
+                      : ''}
                   </p>
                 </div>
                 <div className="shrink-0 text-right">
                   <p className="text-sm font-bold text-[#0f1a33]">{formatINR(r.totalAmount)}</p>
-                  <div className="mt-1 capitalize">
-                    <Badge tone={paymentTone(r.paymentStatus)}>{r.paymentStatus}</Badge>
-                  </div>
                 </div>
               </div>
             ))}
@@ -205,18 +204,14 @@ export function TransactionsPage() {
 
           <Card padding={false} className="hidden md:block">
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[900px] text-left text-sm">
+              <table className="w-full min-w-[720px] text-left text-sm">
                 <thead>
                   <tr className="border-b border-surface-border bg-slate-50/80 text-ink-muted">
                     <th className="px-4 py-3 font-medium">Date</th>
                     <th className="px-4 py-3 font-medium">Customer</th>
                     <th className="px-4 py-3 font-medium">Worker</th>
-                    <th className="px-4 py-3 font-medium">Service</th>
                     <th className="px-4 py-3 font-medium">Amount</th>
-                    <th className="px-4 py-3 font-medium">Paid</th>
-                    <th className="px-4 py-3 font-medium">Pending</th>
                     <th className="px-4 py-3 font-medium">Method</th>
-                    <th className="px-4 py-3 font-medium">Status</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -225,13 +220,11 @@ export function TransactionsPage() {
                       <td className="px-4 py-3 text-ink-soft">{formatDate(r.createdAt)}</td>
                       <td className="px-4 py-3 font-medium text-ink">{r.customerName}</td>
                       <td className="px-4 py-3">{workerName(r.workerId)}</td>
-                      <td className="px-4 py-3">{r.serviceName}</td>
                       <td className="px-4 py-3 font-medium">{formatINR(r.totalAmount)}</td>
-                      <td className="px-4 py-3">{formatINR(r.amountPaid)}</td>
-                      <td className="px-4 py-3 text-amber-700">{formatINR(r.amountPending)}</td>
-                      <td className="px-4 py-3 capitalize">{r.paymentMethod ?? '—'}</td>
                       <td className="px-4 py-3">
-                        <Badge tone={paymentTone(r.paymentStatus)}>{r.paymentStatus}</Badge>
+                        {r.paymentMethod
+                          ? METHOD_LABELS[r.paymentMethod] ?? r.paymentMethod
+                          : '—'}
                       </td>
                     </tr>
                   ))}
@@ -284,28 +277,15 @@ export function TransactionsPage() {
             </Select>
           </Field>
 
-          <Field label="Payment status">
+          <Field label="Payment method">
             <Select
-              value={draft.status}
-              onChange={(e) => setDraft((f) => ({ ...f, status: e.target.value }))}
+              value={draft.paymentMethod}
+              onChange={(e) => setDraft((f) => ({ ...f, paymentMethod: e.target.value }))}
             >
-              <option value="all">All statuses</option>
-              <option value="paid">Paid</option>
-              <option value="pending">Pending</option>
-              <option value="partial">Partial</option>
-              <option value="refunded">Refunded</option>
-            </Select>
-          </Field>
-
-          <Field label="Service">
-            <Select
-              value={draft.serviceId}
-              onChange={(e) => setDraft((f) => ({ ...f, serviceId: e.target.value }))}
-            >
-              <option value="all">All services</option>
-              {services.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
+              <option value="all">All methods</option>
+              {(Object.keys(METHOD_LABELS) as PaymentMethod[]).map((m) => (
+                <option key={m} value={m}>
+                  {METHOD_LABELS[m]}
                 </option>
               ))}
             </Select>

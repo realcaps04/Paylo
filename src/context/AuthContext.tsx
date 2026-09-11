@@ -28,7 +28,7 @@ import {
 } from '@/lib/staffLogin'
 import { loadJSON, removeKey, saveJSON } from '@/lib/storage'
 import { uid } from '@/lib/format'
-import { createDemoStore } from '@/data/demo'
+
 
 interface AuthContextValue {
   session: AuthSession | null
@@ -51,65 +51,6 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
-
-const DEMO_USERS: Record<
-  string,
-  {
-    user: User
-    role: Role
-    shopIds: string[]
-    workerId?: string
-    onboarded: boolean
-  }
-> = {
-  owner: {
-    user: {
-      id: 'u_owner',
-      name: 'Priya Sharma',
-      email: 'priya@mainsalon.in',
-      phone: '+91 98765 43210',
-      avatar: 'PS',
-      provider: 'google',
-    },
-    role: 'owner',
-    shopIds: ['shop_main', 'shop_barber'],
-    workerId: 'w_owner',
-    onboarded: true,
-  },
-  worker: {
-    user: {
-      id: 'u_anjali',
-      name: 'Anjali Mehta',
-      email: 'anjali@mainsalon.in',
-      phone: '+91 98111 22334',
-      avatar: 'AM',
-      provider: 'google',
-    },
-    role: 'worker',
-    shopIds: ['shop_main'],
-    workerId: 'w_anjali',
-    onboarded: true,
-  },
-  new: {
-    user: {
-      id: 'u_new',
-      name: 'Alex Rivera',
-      email: 'alex.rivera@gmail.com',
-      avatar: 'AR',
-      provider: 'google',
-    },
-    role: 'owner',
-    shopIds: [],
-    onboarded: false,
-  },
-}
-
-function ensureDemoData() {
-  const store = loadJSON<{ shops?: unknown[] } | null>('store', null)
-  if (!store?.shops?.length) {
-    saveJSON('store', createDemoStore())
-  }
-}
 
 function initials(name: string) {
   return name
@@ -160,7 +101,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false
     void (async () => {
-      const saved = loadJSON<AuthSession | null>('session', null)
+      const DEMO_SHOP_IDS = new Set(['shop_main', 'shop_barber'])
+      const savedRaw = loadJSON<AuthSession | null>('session', null)
+      const saved = savedRaw
+        ? {
+            ...savedRaw,
+            shopIds: savedRaw.shopIds.filter((id) => !DEMO_SHOP_IDS.has(id)),
+            activeShopId:
+              savedRaw.activeShopId && DEMO_SHOP_IDS.has(savedRaw.activeShopId)
+                ? null
+                : savedRaw.activeShopId,
+          }
+        : null
+      // normalize empty active shop
+      if (saved && !saved.activeShopId && saved.shopIds[0]) {
+        saved.activeShopId = saved.shopIds[0]
+      }
       if (!saved) {
         if (!cancelled) {
           setSession(null)
@@ -199,8 +155,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             onboarded: next.onboarded,
           })
         } else if (needsRestore) {
-          const { user, shop } = await fetchCloudMembership(saved.user.email)
-          if (isReturningMember({ cloudUser: user, cloudShop: shop })) {
+          const { user, shop, shops } = await fetchCloudMembership(saved.user.email)
+          if (isReturningMember({ cloudUser: user, cloudShop: shop, cloudShops: shops })) {
             next = buildReturningSession({
               profile: {
                 id: saved.user.id,
@@ -214,9 +170,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 role: saved.role,
                 shopIds: saved.shopIds,
                 workerId: saved.workerId,
+                activeShopId: saved.activeShopId,
               },
               cloudUser: user,
               cloudShop: shop,
+              cloudShops: shops,
             })
             saveJSON('session', next)
             syncAccountFromSession({
@@ -231,8 +189,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             })
           }
         } else if (saved.onboarded) {
-          const { shop } = await fetchCloudMembership(saved.user.email)
-          if (shop) {
+          const { shop, shops } = await fetchCloudMembership(saved.user.email)
+          if (shop || shops.length > 0) {
             buildReturningSession({
               profile: {
                 id: saved.user.id,
@@ -246,9 +204,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 role: saved.role,
                 shopIds: saved.shopIds,
                 workerId: saved.workerId,
+                activeShopId: saved.activeShopId,
               },
               cloudUser: null,
               cloudShop: shop,
+              cloudShops: shops,
             })
           }
         }
@@ -318,17 +278,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return staffSession
         }
 
-        const { user: cloudUser, shop: cloudShop } = await fetchCloudMembership(profile.email)
+        const { user: cloudUser, shop: cloudShop, shops: cloudShops } = await fetchCloudMembership(profile.email)
 
         const returning = isReturningMember({
           localOnboarded: existing?.onboarded,
           localShopIds: existing?.shopIds,
           cloudUser,
           cloudShop,
+          cloudShops,
         })
 
         // Existing shop owners always skip onboarding — even if UI said "signup"
-        if (returning && (cloudShop || existing?.role === 'owner' || cloudUser?.role === 'owner')) {
+        if (returning && (cloudShop || cloudShops.length > 0 || existing?.role === 'owner' || cloudUser?.role === 'owner')) {
           const next = buildReturningSession({
             profile,
             provider: 'google',
@@ -342,6 +303,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               : null,
             cloudUser,
             cloudShop,
+            cloudShops,
           })
 
           if (convexReady && convex) {
@@ -425,20 +387,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 
   const loginAsDemo = useCallback(
-    async (kind: 'owner' | 'worker' | 'new') => {
+    async (_kind: 'owner' | 'worker' | 'new') => {
       setError(null)
       setBusy(true)
-      await new Promise((r) => setTimeout(r, 500))
-      if (kind !== 'new') ensureDemoData()
-      const pick = DEMO_USERS[kind]
+      await new Promise((r) => setTimeout(r, 300))
       persist({
-        user: pick.user,
-        role: pick.role,
-        shopIds: [...pick.shopIds],
-        activeShopId: pick.shopIds[0] ?? null,
-        workerId: pick.workerId,
-        onboarded: pick.onboarded,
-        roleChosen: pick.onboarded,
+        user: {
+          id: uid('u'),
+          name: 'New User',
+          email: 'user@example.com',
+          avatar: 'NU',
+          provider: 'google',
+        },
+        role: 'owner',
+        shopIds: [],
+        activeShopId: null,
+        onboarded: false,
+        roleChosen: false,
       })
       setBusy(false)
     },
@@ -472,7 +437,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return
       }
 
-      const { user: cloudUser, shop: cloudShop } = await fetchCloudMembership(email)
+      const { user: cloudUser, shop: cloudShop, shops: cloudShops } = await fetchCloudMembership(email)
 
       if (
         isReturningMember({
@@ -480,8 +445,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           localShopIds: existing?.shopIds,
           cloudUser,
           cloudShop,
+          cloudShops,
         }) &&
-        (cloudShop || existing?.role === 'owner' || cloudUser?.role === 'owner')
+        (cloudShop || cloudShops.length > 0 || existing?.role === 'owner' || cloudUser?.role === 'owner')
       ) {
         persist(
           buildReturningSession({
@@ -502,24 +468,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               : null,
             cloudUser,
             cloudShop,
+            cloudShops,
           }),
         )
         setBusy(false)
         return
       }
 
-      // Demo shortcut for exploring without Google
-      const isWorker = email.toLowerCase().includes('anjali')
-      ensureDemoData()
-      const pick = isWorker ? DEMO_USERS.worker : DEMO_USERS.owner
+      // New email account — continue into role / onboarding (no dummy shop data)
       persist({
-        user: { ...pick.user, email, provider: 'email' },
-        role: pick.role,
-        shopIds: [...pick.shopIds],
-        activeShopId: pick.shopIds[0] ?? null,
-        workerId: pick.workerId,
-        onboarded: true,
-        roleChosen: true,
+        user: {
+          id: existing?.userId || uid('u'),
+          name: existing?.name || email.split('@')[0],
+          email,
+          avatar: (existing?.name || email.split('@')[0])
+            .split(' ')
+            .map((n) => n[0])
+            .join('')
+            .slice(0, 2)
+            .toUpperCase(),
+          picture: existing?.picture ?? undefined,
+          provider: 'email',
+        },
+        role: 'owner',
+        shopIds: [],
+        activeShopId: null,
+        onboarded: false,
+        roleChosen: false,
       })
       setBusy(false)
     },

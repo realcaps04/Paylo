@@ -209,7 +209,7 @@ function ShopScene({ className }: { className?: string }) {
 }
 
 export function LoginPage() {
-  const { loginWithGoogle, loginAsDemo, busy, loading, error, clearError, googleReady } =
+  const { loginWithGoogle, busy, loading, error, clearError, googleReady } =
     useAuth()
   const navigate = useNavigate()
   const authBusy = busy || loading
@@ -228,12 +228,6 @@ export function LoginPage() {
         setCancelOpen(true)
       }
     }
-  }
-
-  const handleDemo = async (kind: 'owner' | 'worker') => {
-    clearError()
-    await loginAsDemo(kind)
-    navigate('/app')
   }
 
   const setupError = error && !/cancelled/i.test(error) ? error : null
@@ -401,24 +395,6 @@ export function LoginPage() {
                 Trusted by thousands of shop owners
               </span>
               <span className="h-px flex-1 bg-slate-200" />
-            </div>
-
-            <div className="mt-2.5 flex justify-center gap-3 text-[10px] text-slate-300">
-              <button
-                type="button"
-                onClick={() => void handleDemo('owner')}
-                className="transition hover:text-slate-500"
-              >
-                Demo Owner
-              </button>
-              <span>·</span>
-              <button
-                type="button"
-                onClick={() => void handleDemo('worker')}
-                className="transition hover:text-slate-500"
-              >
-                Demo Worker
-              </button>
             </div>
           </motion.div>
         </div>

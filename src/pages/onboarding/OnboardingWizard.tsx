@@ -234,7 +234,7 @@ function FancySelect({
   )
 }
 
-export function OnboardingWizard() {
+export function OnboardingWizard({ mode = 'first' }: { mode?: 'first' | 'add' }) {
   const navigate = useNavigate()
   const { session, attachShop, clearRoleChoice, logout } = useAuth()
   const { addShop, addWorker, addService } = useShop()
@@ -242,6 +242,7 @@ export function OnboardingWizard() {
   const { toast } = useToast()
   const shopApi = useShopSetupApi()
   const fileRef = useRef<HTMLInputElement>(null)
+  const isAddShop = mode === 'add'
 
   const [step, setStep] = useState(1)
   const [saving, setSaving] = useState(false)
@@ -317,7 +318,7 @@ export function OnboardingWizard() {
         logoStorageId = await shopApi.uploadLogo(logoFile)
       }
 
-      const convexShopId = await shopApi.saveShop({
+      const payload = {
         ownerEmail: session.user.email,
         ownerName: session.user.name,
         ownerPicture: session.user.picture,
@@ -334,7 +335,12 @@ export function OnboardingWizard() {
         whatsappNumber: whatsappNumber.trim() || undefined,
         categoryId: category.id,
         categoryName: category.name,
-      })
+      }
+
+      // Additional shops must create a new Convex row — never overwrite the first shop
+      const convexShopId = isAddShop
+        ? await shopApi.createShop(payload)
+        : await shopApi.saveShop(payload)
 
       const shopId = convexShopId ? String(convexShopId) : uid('shop')
       const ownerWorkerId = uid('w')
@@ -388,7 +394,15 @@ export function OnboardingWizard() {
 
       attachShop(shopId, 'owner', ownerWorkerId)
       setShowInstallHint(true)
-      toast(shopApi.ready ? 'Shop saved to Paylo cloud' : 'Shop created locally')
+      toast(
+        isAddShop
+          ? shopApi.ready
+            ? 'New shop added'
+            : 'New shop created locally'
+          : shopApi.ready
+            ? 'Shop saved to Paylo cloud'
+            : 'Shop created locally',
+      )
       navigate('/app')
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Could not save shop'
@@ -412,6 +426,10 @@ export function OnboardingWizard() {
   const goBack = () => {
     setError(null)
     if (step === 1) {
+      if (isAddShop) {
+        navigate('/app')
+        return
+      }
       clearRoleChoice()
       navigate('/onboarding/role')
       return
@@ -420,6 +438,10 @@ export function OnboardingWizard() {
   }
 
   const skip = () => {
+    if (isAddShop) {
+      navigate('/app')
+      return
+    }
     logout()
     navigate('/login')
   }
@@ -458,7 +480,7 @@ export function OnboardingWizard() {
             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#0064f0]">
               Step {step} of 4 · {STEP_META[step - 1].badge}
             </p>
-            <p className="text-[12px] font-medium text-slate-400">Shop owner setup</p>
+            <p className="text-[12px] font-medium text-slate-400">{isAddShop ? 'Add another shop' : 'Shop owner setup'}</p>
           </div>
         </div>
 

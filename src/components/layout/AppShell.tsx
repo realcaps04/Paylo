@@ -178,7 +178,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                           className="mt-1 flex w-full rounded-xl px-3 py-2.5 text-left text-sm font-medium text-brand-700 hover:bg-brand-50"
                           onClick={() => {
                             setShopOpen(false)
-                            navigate('/onboarding')
+                            navigate('/onboarding/new-shop')
                           }}
                         >
                           + Add Another Shop

@@ -35,21 +35,24 @@ export type ConvexUserDoc = {
 export async function fetchCloudMembership(email: string): Promise<{
   user: ConvexUserDoc | null
   shop: ConvexShopDoc | null
+  shops: ConvexShopDoc[]
 }> {
   if (!convexReady || !convexHttp || !email.trim()) {
-    return { user: null, shop: null }
+    return { user: null, shop: null, shops: [] }
   }
   try {
-    const [user, shop] = await Promise.all([
+    const [user, shops] = await Promise.all([
       convexHttp.query(api.users.getByEmail, { email }),
-      convexHttp.query(api.shops.getByOwnerEmail, { ownerEmail: email }),
+      convexHttp.query(api.shops.listByOwnerEmail, { ownerEmail: email }),
     ])
+    const list = (shops as ConvexShopDoc[] | null) ?? []
     return {
       user: (user as ConvexUserDoc | null) ?? null,
-      shop: (shop as ConvexShopDoc | null) ?? null,
+      shop: list[0] ?? null,
+      shops: list,
     }
   } catch {
-    return { user: null, shop: null }
+    return { user: null, shop: null, shops: [] }
   }
 }
 
@@ -143,7 +146,9 @@ export function isReturningMember(input: {
   localShopIds?: string[]
   cloudUser: ConvexUserDoc | null
   cloudShop: ConvexShopDoc | null
+  cloudShops?: ConvexShopDoc[]
 }) {
+  if ((input.cloudShops?.length ?? 0) > 0) return true
   if (input.cloudShop) return true
   if (input.cloudUser?.onboarded) return true
   if (input.localOnboarded && (input.localShopIds?.length ?? 0) > 0) return true
@@ -163,22 +168,39 @@ export function buildReturningSession(input: {
     role: Role
     shopIds: string[]
     workerId?: string
+    activeShopId?: string | null
   } | null
   cloudUser: ConvexUserDoc | null
   cloudShop: ConvexShopDoc | null
+  cloudShops?: ConvexShopDoc[]
 }): AuthSession {
-  const cloudShopId = input.cloudShop ? String(input.cloudShop._id) : null
-  const shopIds = cloudShopId
-    ? [cloudShopId, ...(input.local?.shopIds ?? []).filter((id) => id !== cloudShopId)]
-    : [...(input.local?.shopIds ?? [])]
+  const cloudList =
+    input.cloudShops && input.cloudShops.length > 0
+      ? input.cloudShops
+      : input.cloudShop
+        ? [input.cloudShop]
+        : []
 
-  if (input.cloudShop) {
-    mergeCloudShopIntoStore(input.cloudShop, {
-      id: input.local?.userId || input.profile.id,
-      name: input.profile.name,
-      email: input.profile.email,
-    })
+  const cloudIds = cloudList.map((s) => String(s._id))
+  const localIds = input.local?.shopIds ?? []
+  const shopIds = [
+    ...cloudIds,
+    ...localIds.filter((id) => !cloudIds.includes(id)),
+  ]
+
+  const owner = {
+    id: input.local?.userId || input.profile.id,
+    name: input.profile.name,
+    email: input.profile.email,
   }
+  for (const shop of cloudList) {
+    mergeCloudShopIntoStore(shop, owner)
+  }
+
+  const preferred =
+    input.local?.activeShopId && shopIds.includes(input.local.activeShopId)
+      ? input.local.activeShopId
+      : shopIds[0] ?? null
 
   return {
     user: {
@@ -196,7 +218,7 @@ export function buildReturningSession(input: {
     },
     role: input.local?.role ?? input.cloudUser?.role ?? 'owner',
     shopIds,
-    activeShopId: shopIds[0] ?? null,
+    activeShopId: preferred,
     workerId: input.local?.workerId,
     onboarded: true,
     roleChosen: true,

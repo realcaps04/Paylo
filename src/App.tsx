@@ -119,6 +119,18 @@ function RequireStaff({ children }: { children: ReactNode }) {
   return children
 }
 
+/** Add another shop — owners only, already onboarded. */
+function RequireOwnerAddShop({ children }: { children: ReactNode }) {
+  const { session } = useAuth()
+  if (!isDashboardReady(session)) {
+    return <Navigate to={onboardingPath(session)} replace />
+  }
+  if (session?.role === 'worker') {
+    return <Navigate to="/app" replace />
+  }
+  return children
+}
+
 function AppRoutes() {
   return (
     <Routes>
@@ -157,6 +169,16 @@ function AppRoutes() {
             <RequireOwnerOnboarding>
               <OnboardingWizard />
             </RequireOwnerOnboarding>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/onboarding/new-shop"
+        element={
+          <RequireAuth>
+            <RequireOwnerAddShop>
+              <OnboardingWizard mode="add" />
+            </RequireOwnerAddShop>
           </RequireAuth>
         }
       />

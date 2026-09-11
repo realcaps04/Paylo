@@ -26,6 +26,7 @@ export type ShopSetupPayload = {
 export function useShopSetupApi() {
   const generateUploadUrl = useMutation(api.shops.generateUploadUrl)
   const upsertForOwner = useMutation(api.shops.upsertForOwner)
+  const createForOwner = useMutation(api.shops.createForOwner)
   const upsertUser = useMutation(api.users.upsertByEmail)
 
   return {
@@ -52,9 +53,15 @@ export function useShopSetupApi() {
       const json = (await result.json()) as { storageId: Id<'_storage'> }
       return json.storageId
     },
+    /** First shop only — patches existing row for that owner email if present. */
     saveShop: async (payload: ShopSetupPayload) => {
       if (!convexReady) return null
       return await upsertForOwner(payload)
+    },
+    /** Always creates a new shop document (for Add Another Shop). */
+    createShop: async (payload: ShopSetupPayload) => {
+      if (!convexReady) return null
+      return await createForOwner(payload)
     },
   }
 }

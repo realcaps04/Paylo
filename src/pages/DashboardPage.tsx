@@ -13,7 +13,7 @@ import {
 import { format, parseISO } from 'date-fns'
 import { useAuth } from '@/context/AuthContext'
 import { useShop } from '@/context/ShopContext'
-import { Badge, Card, PageHeader, paymentTone } from '@/components/ui'
+import { Card, PageHeader } from '@/components/ui'
 import { formatINR, formatDate, greeting } from '@/lib/format'
 import { filterByDateRange, sumField } from '@/lib/permissions'
 import { cn } from '@/lib/cn'
@@ -34,14 +34,6 @@ function methodLabel(method?: PaymentMethod) {
     other: 'Other',
   }
   return map[method]
-}
-
-function statusLabel(status: string) {
-  if (status === 'paid') return 'Completed'
-  if (status === 'partial') return 'Partial'
-  if (status === 'pending') return 'Pending'
-  if (status === 'refunded') return 'Refunded'
-  return status
 }
 
 function OwnerDashboard() {
@@ -220,24 +212,13 @@ function OwnerDashboard() {
                 </span>
               </div>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-[#0f1a33]">{r.serviceName}</p>
+                <p className="truncate text-sm font-semibold text-[#0f1a33]">{r.customerName}</p>
                 <p className="truncate text-xs text-slate-500">
                   {format(parseISO(r.createdAt), 'h:mm a')} · {methodLabel(r.paymentMethod)}
                 </p>
               </div>
               <div className="shrink-0 text-right">
                 <p className="text-sm font-bold text-[#0f1a33]">{formatINR(r.totalAmount)}</p>
-                <span
-                  className={cn(
-                    'mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold',
-                    r.paymentStatus === 'paid' && 'bg-emerald-50 text-emerald-700',
-                    r.paymentStatus === 'partial' && 'bg-amber-50 text-amber-700',
-                    r.paymentStatus === 'pending' && 'bg-slate-100 text-slate-600',
-                    r.paymentStatus === 'refunded' && 'bg-red-50 text-red-600',
-                  )}
-                >
-                  {statusLabel(r.paymentStatus)}
-                </span>
               </div>
             </div>
           ))}
@@ -322,13 +303,10 @@ function WorkerDashboard() {
             >
               <div>
                 <p className="text-sm font-semibold text-ink">{r.customerName}</p>
-                <p className="text-xs text-ink-muted">
-                  {r.serviceName} · {formatDate(r.createdAt)}
-                </p>
+                <p className="text-xs text-ink-muted">{formatDate(r.createdAt)}</p>
               </div>
               <div className="text-right">
                 <p className="text-sm font-semibold">{formatINR(r.totalAmount)}</p>
-                <Badge tone={paymentTone(r.paymentStatus)}>{statusLabel(r.paymentStatus)}</Badge>
               </div>
             </div>
           ))}
