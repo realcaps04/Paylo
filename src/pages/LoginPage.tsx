@@ -312,22 +312,22 @@ export function LoginPage() {
             transition={{ delay: 0.1, duration: 0.45, ease: 'easeOut' }}
             className="relative flex min-h-[148px] items-center"
           >
-            <div className="relative z-20 w-[62%] pr-2">
-              <h1 className="font-display text-[25px] font-extrabold leading-[1.2] tracking-[-0.025em] text-[#0f1a33]">
-                Smarter Payments for
-                <br />
-                <span className="text-[#0064f0]">Growing Shops</span>
+            <div className="relative z-20 pr-1">
+              <h1 className="font-display text-[23px] font-extrabold leading-[1.22] tracking-[-0.02em] text-[#0f1a33]">
+                <span className="block whitespace-nowrap">Smarter Payments for</span>
+                <span className="block whitespace-nowrap text-[#0064f0]">Growing Shops</span>
               </h1>
-              <p className="mt-3 max-w-[220px] text-[13px] leading-[1.5] text-slate-500">
-                Accept payments, track sales and manage your shop —
-                <br />
-                all in one simple app.
+              <p className="mt-3 text-[12.5px] leading-[1.5] text-slate-500">
+                <span className="block whitespace-nowrap">
+                  Accept payments, track sales and manage your shop —
+                </span>
+                <span className="block whitespace-nowrap">all in one simple app.</span>
               </p>
             </div>
             <motion.div
               animate={{ y: [0, -6, 0] }}
               transition={{ duration: 5.5, repeat: Infinity, ease: 'easeInOut' }}
-              className="absolute -right-3 top-1/2 z-10 w-[48%] -translate-y-1/2"
+              className="pointer-events-none absolute -right-4 top-0 z-10 w-[52%] max-w-[200px]"
             >
               <ShopScene className="h-auto w-full" />
             </motion.div>
