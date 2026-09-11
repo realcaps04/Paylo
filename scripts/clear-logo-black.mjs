@@ -1,47 +1,7 @@
 import sharp from 'sharp'
 
-const src = 'public/paylo-logo-source.png'
-const { data, info } = await sharp(src).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
-
-let minX = info.width
-let minY = info.height
-let maxX = 0
-let maxY = 0
-
-for (let y = 0; y < info.height; y++) {
-  for (let x = 0; x < info.width; x++) {
-    const i = (y * info.width + x) * 4
-    if (data[i] + data[i + 1] + data[i + 2] > 30) {
-      if (x < minX) minX = x
-      if (y < minY) minY = y
-      if (x > maxX) maxX = x
-      if (y > maxY) maxY = y
-    }
-  }
-}
-
-const cx = Math.round((minX + maxX) / 2)
-const cy = Math.round((minY + maxY) / 2)
-const side = Math.max(maxX - minX + 1, maxY - minY + 1) + 12
-let left = Math.round(cx - side / 2)
-let top = Math.round(cy - side / 2)
-left = Math.max(0, Math.min(left, info.width - side))
-top = Math.max(0, Math.min(top, info.height - side))
-
-console.log({ cx, cy, side, left, top })
-
-await sharp(src)
-  .extract({ left, top, width: side, height: side })
-  .resize(1024, 1024)
-  .png()
-  .toFile('public/paylo_applogo.png')
-
-// Remove opaque black outside the squircle so it sits cleanly on any bg
-{
-  const { data, info } = await sharp('public/paylo_applogo.png')
-    .ensureAlpha()
-    .raw()
-    .toBuffer({ resolveWithObject: true })
+async function clearBlack(path) {
+  const { data, info } = await sharp(path).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
   for (let i = 0; i < data.length; i += 4) {
     if (data[i] + data[i + 1] + data[i + 2] < 24) {
       data[i] = 0
@@ -54,8 +14,10 @@ await sharp(src)
     raw: { width: info.width, height: info.height, channels: 4 },
   })
     .png()
-    .toFile('public/paylo_applogo.png')
+    .toFile(path)
 }
+
+await clearBlack('public/paylo_applogo.png')
 
 function circleSvg(size) {
   return Buffer.from(
@@ -94,4 +56,4 @@ await sharp(bg)
   .png()
   .toFile('public/pwa-512x512-maskable.png')
 
-console.log('accurate logo assets ready')
+console.log('cleared black corners + regenerated icons')

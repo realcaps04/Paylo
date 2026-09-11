@@ -364,7 +364,7 @@ export function LogoMark({
   size = 'md',
   className,
 }: {
-  size?: 'sm' | 'md' | 'lg' | 'xl'
+  size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl'
   className?: string
 }) {
   return (
@@ -380,6 +380,7 @@ export function LogoMark({
         size === 'md' && 'h-10 w-10',
         size === 'lg' && 'h-14 w-14',
         size === 'xl' && 'h-[88px] w-[88px]',
+        size === '2xl' && 'h-[118px] w-[118px]',
         className,
       )}
     />

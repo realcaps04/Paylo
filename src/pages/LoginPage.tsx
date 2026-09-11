@@ -1,20 +1,21 @@
+import { Fragment } from 'react'
 import { motion } from 'framer-motion'
 import {
   ArrowRight,
   BarChart3,
-  Bolt,
-  FileText,
-  HelpCircle,
-  ShieldCheck,
-  Users,
+  CreditCard,
+  Headphones,
+  Loader2,
+  Store,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { Button, LogoMark } from '@/components/ui'
+import { LogoMark } from '@/components/ui'
 import { useAuth } from '@/context/AuthContext'
+import { cn } from '@/lib/cn'
 
-function GoogleGlyph() {
+function GoogleGlyph({ className }: { className?: string }) {
   return (
-    <svg className="h-4 w-4" viewBox="0 0 24 24" aria-hidden>
+    <svg className={className} viewBox="0 0 24 24" aria-hidden>
       <path
         fill="#4285F4"
         d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -36,104 +37,166 @@ function GoogleGlyph() {
 }
 
 const FEATURES = [
-  { icon: BarChart3, label: 'Track Payments' },
-  { icon: Users, label: 'Manage Team' },
-  { icon: FileText, label: 'Record Transactions' },
+  { icon: CreditCard, top: 'Accept', bottom: 'Payments' },
+  { icon: BarChart3, top: 'Track', bottom: 'Your Sales' },
+  { icon: Store, top: 'Grow', bottom: 'Your Shop' },
 ] as const
 
-const TRUST = [
-  { icon: ShieldCheck, label: 'Secure & Reliable' },
-  { icon: Bolt, label: 'Fast & Simple' },
-  { icon: Users, label: 'Built for Shop Owners' },
-] as const
-
-function PhonePreview() {
-  const rows = [
-    { title: 'Order Payment', status: 'Paid', tone: 'paid' as const },
-    { title: 'Advance Payment', status: 'Paid', tone: 'paid' as const },
-    { title: 'Balance Payment', status: 'Pending', tone: 'pending' as const },
-  ]
+/** Shop + payments-chart scene, drawn to match the brand illustration. */
+function ShopScene({ className }: { className?: string }) {
+  const scallops = Array.from({ length: 6 }, (_, i) => i)
 
   return (
-    <div className="relative mx-auto mt-5 h-[210px] w-full max-w-[340px]">
-      {/* Left chart float */}
-      <motion.div
-        initial={{ opacity: 0, x: -12, y: 10 }}
-        animate={{ opacity: 1, x: 0, y: 0 }}
-        transition={{ delay: 0.25, duration: 0.45 }}
-        className="absolute left-0 top-10 z-20 flex h-[72px] w-[72px] items-end justify-center gap-1 rounded-2xl bg-white/95 px-2.5 pb-2.5 pt-3 shadow-[0_12px_28px_rgba(0,40,120,0.22)]"
-      >
-        <span className="h-5 w-2.5 rounded-sm bg-[#8ec5ff]" />
-        <span className="h-8 w-2.5 rounded-sm bg-[#4d94ff]" />
-        <span className="h-11 w-2.5 rounded-sm bg-[#0064f0]" />
-        <span className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full bg-[#0064f0] text-white shadow-md">
-          <ArrowRight className="h-3.5 w-3.5 -rotate-45" strokeWidth={2.75} />
-        </span>
-      </motion.div>
+    <svg viewBox="0 0 340 236" className={className} aria-hidden>
+      <defs>
+        <linearGradient id="ps-body" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#ffffff" />
+          <stop offset="100%" stopColor="#eaf1fd" />
+        </linearGradient>
+        <linearGradient id="ps-roof" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#ffffff" />
+          <stop offset="100%" stopColor="#dfe9fb" />
+        </linearGradient>
+        <linearGradient id="ps-awning" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#2f8bff" />
+          <stop offset="100%" stopColor="#0058de" />
+        </linearGradient>
+        <linearGradient id="ps-bar" x1="0" y1="1" x2="0" y2="0">
+          <stop offset="0%" stopColor="#8ec3ff" />
+          <stop offset="100%" stopColor="#0064f0" />
+        </linearGradient>
+        <linearGradient id="ps-leaf" x1="0" y1="1" x2="1" y2="0">
+          <stop offset="0%" stopColor="#2f9c5c" />
+          <stop offset="100%" stopColor="#4cc07c" />
+        </linearGradient>
+        <linearGradient id="ps-door" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#2b3a58" />
+          <stop offset="100%" stopColor="#1b2740" />
+        </linearGradient>
+        <clipPath id="ps-awning-clip">
+          <path
+            d={`M 90 76 H 254 V 100 ${scallops
+              .map(() => 'q -13.67 13 -27.33 0')
+              .join(' ')} Z`}
+          />
+        </clipPath>
+      </defs>
 
-      {/* Phone */}
-      <motion.div
-        initial={{ opacity: 0, y: 18, rotate: 4 }}
-        animate={{ opacity: 1, y: 0, rotate: 7 }}
-        transition={{ delay: 0.12, type: 'spring', stiffness: 180, damping: 20 }}
-        className="absolute left-1/2 top-2 z-10 w-[168px] -translate-x-[46%] overflow-hidden rounded-[28px] border-[5px] border-[#0b1f4d]/90 bg-white shadow-[0_24px_50px_rgba(0,30,90,0.35)]"
-      >
-        <div className="flex items-center gap-1.5 border-b border-slate-100 bg-[#f8fbff] px-3 py-2.5">
-          <img src="/paylo_applogo.png" alt="" className="h-5 w-5 object-contain" />
-          <span className="text-[11px] font-bold tracking-tight text-[#0f172a]">Paylo</span>
-        </div>
-        <div className="space-y-2 bg-white px-2.5 py-2.5">
-          {rows.map((row) => (
-            <div
-              key={row.title}
-              className="flex items-center justify-between rounded-xl bg-[#f4f8ff] px-2.5 py-2"
-            >
-              <div>
-                <p className="text-[10px] font-semibold text-slate-800">{row.title}</p>
-                <p className="text-[8px] text-slate-400">Today</p>
-              </div>
-              <span
-                className={
-                  row.tone === 'paid'
-                    ? 'rounded-full bg-emerald-100 px-1.5 py-0.5 text-[8px] font-semibold text-emerald-700'
-                    : 'rounded-full bg-sky-100 px-1.5 py-0.5 text-[8px] font-semibold text-sky-700'
-                }
-              >
-                {row.status}
-              </span>
-            </div>
-          ))}
-        </div>
-      </motion.div>
+      {/* Payments card behind the shop */}
+      <g transform="rotate(-7 256 68)">
+        <rect x="192" y="8" width="126" height="118" rx="15" fill="#ffffff" />
+        <rect
+          x="192"
+          y="8"
+          width="126"
+          height="118"
+          rx="15"
+          fill="none"
+          stroke="#dce8fd"
+          strokeWidth="1.5"
+        />
+        <text
+          x="208"
+          y="34"
+          fill="#7c8ba5"
+          fontSize="12"
+          fontWeight="600"
+          fontFamily="inherit"
+        >
+          Payments
+        </text>
+        <rect x="209" y="86" width="13" height="22" rx="4" fill="url(#ps-bar)" opacity="0.55" />
+        <rect x="229" y="74" width="13" height="34" rx="4" fill="url(#ps-bar)" opacity="0.75" />
+        <rect x="249" y="60" width="13" height="48" rx="4" fill="url(#ps-bar)" opacity="0.9" />
+        <rect x="269" y="46" width="13" height="62" rx="4" fill="url(#ps-bar)" />
+        <path
+          d="M208 94 C 234 90 248 68 288 46"
+          fill="none"
+          stroke="#0064f0"
+          strokeWidth="3"
+          strokeLinecap="round"
+        />
+        <path
+          d="M275 44 L 291 43 L 288 58"
+          fill="none"
+          stroke="#0064f0"
+          strokeWidth="3"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </g>
 
-      {/* Receipt float */}
-      <motion.div
-        initial={{ opacity: 0, x: 14, y: 8 }}
-        animate={{ opacity: 1, x: 0, y: 0 }}
-        transition={{ delay: 0.3, duration: 0.45 }}
-        className="absolute right-1 top-8 z-20 flex h-[78px] w-[58px] flex-col gap-1.5 rounded-xl bg-white px-2.5 py-3 shadow-[0_12px_28px_rgba(0,40,120,0.22)]"
-      >
-        <span className="h-1.5 w-full rounded-full bg-slate-200" />
-        <span className="h-1.5 w-[80%] rounded-full bg-slate-200" />
-        <span className="h-1.5 w-[65%] rounded-full bg-slate-200" />
-        <span className="mt-auto h-2 w-full rounded-full bg-[#0064f0]/80" />
-      </motion.div>
+      {/* Ground shadow + plinth */}
+      <ellipse cx="168" cy="212" rx="104" ry="11" fill="#0064f0" opacity="0.09" />
+      <rect x="76" y="196" width="188" height="16" rx="8" fill="#e2ebf9" />
+      <rect x="80" y="194" width="180" height="7" rx="3.5" fill="#f2f7ff" />
 
-      {/* Script slogan */}
-      <motion.p
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.45, duration: 0.5 }}
-        className="absolute bottom-1 right-0 z-20 max-w-[132px] text-right font-[Caveat,cursive] text-[22px] font-bold leading-[1.05] text-white drop-shadow-[0_2px_8px_rgba(0,40,100,0.35)]"
-      >
-        Smarter Shops
-        <br />
-        Brighter Tomorrows
-        <span className="mt-0.5 block text-[18px] font-normal leading-none opacity-80">
-          ~~~
-        </span>
-      </motion.p>
-    </div>
+      {/* Shop body */}
+      <rect x="96" y="102" width="150" height="96" rx="5" fill="url(#ps-body)" />
+      <rect x="228" y="102" width="18" height="96" fill="#e6eefc" opacity="0.75" />
+
+      {/* Roof slab */}
+      <rect x="84" y="62" width="176" height="15" rx="7.5" fill="url(#ps-roof)" />
+      <rect x="88" y="62" width="168" height="6" rx="3" fill="#ffffff" />
+
+      {/* Striped awning with scalloped hem */}
+      <g clipPath="url(#ps-awning-clip)">
+        {scallops.map((i) => (
+          <rect
+            key={i}
+            x={90 + i * 27.34}
+            y={76}
+            width={27.4}
+            height={36}
+            fill={i % 2 === 0 ? 'url(#ps-awning)' : '#ffffff'}
+          />
+        ))}
+      </g>
+      <path
+        d={`M 90 76 H 254 V 100 ${scallops.map(() => 'q -13.67 13 -27.33 0').join(' ')} Z`}
+        fill="none"
+        stroke="#cfe0fb"
+        strokeWidth="1.2"
+      />
+
+      {/* Door */}
+      <rect x="142" y="136" width="38" height="62" rx="5" fill="url(#ps-door)" />
+      <rect x="147" y="141" width="10" height="52" rx="4" fill="#ffffff" opacity="0.07" />
+      <circle cx="174" cy="168" r="2.1" fill="#9db2d4" />
+      <rect x="137" y="194" width="48" height="7" rx="3.5" fill="#dae4f5" />
+
+      {/* Window */}
+      <rect x="196" y="134" width="40" height="34" rx="6" fill="#c2dcff" />
+      <rect
+        x="196"
+        y="134"
+        width="40"
+        height="34"
+        rx="6"
+        fill="none"
+        stroke="#9ac6ff"
+        strokeWidth="1.6"
+      />
+      <path d="M216 134 V168 M196 151 H236" stroke="#ffffff" strokeWidth="3" />
+
+      {/* Potted plant */}
+      <path
+        d="M120 174 C 111 160 112 145 121 134 C 129 146 128 162 120 174 Z"
+        fill="url(#ps-leaf)"
+      />
+      <path
+        d="M119 175 C 108 168 101 155 103 143 C 114 149 121 163 119 175 Z"
+        fill="url(#ps-leaf)"
+        opacity="0.88"
+      />
+      <path
+        d="M121 175 C 132 169 139 157 137 145 C 126 151 119 163 121 175 Z"
+        fill="url(#ps-leaf)"
+        opacity="0.72"
+      />
+      <path d="M108 176 H134 L130 198 H112 Z" fill="#dee6f4" />
+      <rect x="105" y="171" width="32" height="8" rx="4" fill="#eef3fc" />
+    </svg>
   )
 }
 
@@ -141,19 +204,16 @@ export function LoginPage() {
   const { loginWithGoogle, loginAsDemo, busy, loading, error, clearError, googleReady } =
     useAuth()
   const navigate = useNavigate()
-
-  const routeAfterSession = (onboarded: boolean, hasShop: boolean) => {
-    if (!onboarded || !hasShop) navigate('/onboarding')
-    else navigate('/app')
-  }
+  const authBusy = busy || loading
 
   const handleGoogle = async () => {
     clearError()
     try {
       const session = await loginWithGoogle({ intent: 'login' })
-      routeAfterSession(session.onboarded, session.shopIds.length > 0)
+      if (!session.onboarded || session.shopIds.length === 0) navigate('/onboarding')
+      else navigate('/app')
     } catch {
-      // error shown via context
+      // surfaced through auth context
     }
   }
 
@@ -163,143 +223,161 @@ export function LoginPage() {
     navigate('/app')
   }
 
-  const authBusy = busy || loading
-
   return (
-    <div className="relative flex min-h-dvh flex-col overflow-x-hidden bg-[#0064f0]">
-      {/* Hero */}
-      <section className="relative flex flex-1 flex-col overflow-hidden bg-[linear-gradient(165deg,#2b8cff_0%,#0064f0_48%,#0052d6_100%)] px-5 pb-8 pt-safe pt-4 text-white sm:px-8">
-        <div className="pointer-events-none absolute -left-28 top-16 h-80 w-80 rounded-full bg-[#7ec8ff]/35 blur-3xl" />
-        <div className="pointer-events-none absolute -right-20 -top-10 h-72 w-72 rounded-full bg-white/20 blur-3xl" />
-        <div className="pointer-events-none absolute bottom-40 left-1/2 h-56 w-[120%] -translate-x-1/2 rounded-[100%] bg-[#4aa7ff]/25 blur-2xl" />
-        <svg
-          className="pointer-events-none absolute -bottom-6 left-0 right-0 h-40 w-full opacity-40"
-          viewBox="0 0 1440 200"
-          preserveAspectRatio="none"
-          aria-hidden
-        >
-          <path
-            fill="rgba(255,255,255,0.12)"
-            d="M0,120 C280,40 480,180 720,110 C980,40 1200,150 1440,80 L1440,200 L0,200 Z"
-          />
-          <path
-            fill="rgba(255,255,255,0.08)"
-            d="M0,150 C320,90 560,190 820,140 C1080,90 1260,170 1440,130 L1440,200 L0,200 Z"
-          />
-        </svg>
+    <div className="relative flex min-h-dvh flex-col overflow-hidden bg-[#fcfdff]">
+      {/* Soft brand background */}
+      <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute -left-28 -top-24 h-80 w-80 rounded-full bg-[#e4efff] blur-[64px]" />
+        <div className="absolute -left-16 top-24 h-48 w-48 rounded-full bg-[#edf4ff] blur-[52px]" />
+        <div className="absolute -right-32 top-[36%] h-[400px] w-[400px] rounded-full bg-[#eef5ff] blur-[56px]" />
+        <div className="absolute -bottom-28 -right-16 h-80 w-80 rounded-full bg-[#e2edff] blur-[60px]" />
+        <div className="absolute bottom-16 -left-20 h-44 w-44 rounded-full bg-[#eff5ff] blur-[50px]" />
+      </div>
 
-        <div className="relative z-10 mx-auto flex w-full max-w-md flex-1 flex-col">
-          <div className="flex justify-end">
-            <a
-              href="mailto:support@paylo.app?subject=Paylo%20Help"
-              className="inline-flex items-center gap-1.5 rounded-full px-1 py-1 text-[12px] font-medium text-white/85 transition hover:bg-white/10 hover:text-white"
-            >
-              Need Help?
-              <HelpCircle className="h-4 w-4" strokeWidth={2} />
-            </a>
-          </div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 14 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4 }}
-            className="mt-2 flex flex-col items-center text-center"
+      <div className="relative z-10 mx-auto flex w-full max-w-[440px] flex-1 flex-col px-6 pb-safe pb-5 pt-safe pt-4">
+        {/* Need help */}
+        <div className="flex justify-end">
+          <a
+            href="mailto:support@paylo.app?subject=Paylo%20Help"
+            className="inline-flex items-center gap-2 rounded-full px-1 py-1 text-[13px] font-medium text-slate-600 transition hover:text-[#0064f0]"
           >
-            <LogoMark
-              size="xl"
-              className="h-[78px] w-[78px] drop-shadow-[0_16px_36px_rgba(0,20,80,0.4)]"
-            />
-            <h1 className="mt-3 font-display text-[34px] font-extrabold tracking-tight">
-              Paylo
-            </h1>
-            <p className="mt-1 text-[13px] font-medium text-white/80">
-              Manage Payments. Grow Your Shop.
-            </p>
-            <h2 className="mt-5 max-w-[300px] font-display text-[26px] font-bold leading-[1.2] tracking-tight sm:text-[28px]">
-              Everything Your Shop Needs In One Place
-            </h2>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.08, duration: 0.35 }}
-            className="mt-5 grid grid-cols-3 gap-2.5"
-          >
-            {FEATURES.map(({ icon: Icon, label }) => (
-              <div
-                key={label}
-                className="flex flex-col items-center gap-2 rounded-[18px] border border-white/25 bg-white/15 px-2 py-3.5 shadow-[0_8px_24px_rgba(0,30,90,0.12)] backdrop-blur-md"
-              >
-                <Icon className="h-6 w-6 text-white" strokeWidth={2.1} />
-                <span className="text-center text-[10px] font-semibold leading-tight text-white">
-                  {label}
-                </span>
-              </div>
-            ))}
-          </motion.div>
-
-          <PhonePreview />
+            <Headphones className="h-[18px] w-[18px] text-[#3d5675]" strokeWidth={2.1} />
+            Need Help?
+          </a>
         </div>
-      </section>
 
-      {/* Bottom CTA sheet */}
-      <section className="relative z-20 -mt-1 rounded-t-[32px] bg-white px-5 pb-safe pb-6 pt-6 shadow-[0_-12px_40px_rgba(0,40,120,0.12)] sm:px-8">
+        {/* Brand */}
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1, duration: 0.35 }}
-          className="mx-auto w-full max-w-md"
+          transition={{ duration: 0.45, ease: 'easeOut' }}
+          className="mt-3 flex flex-col items-center"
+        >
+          <LogoMark size="2xl" className="drop-shadow-[0_18px_36px_rgba(0,86,214,0.22)]" />
+          <div className="mt-4 flex items-end justify-center">
+            <img
+              src="/paylo-p-glyph.png"
+              alt=""
+              aria-hidden
+              className="h-[48px] w-auto translate-y-[8px] select-none"
+            />
+            <span className="font-display text-[46px] font-extrabold leading-[0.9] tracking-[-0.03em] text-[#0f1a33]">
+              aylo
+            </span>
+          </div>
+          <p className="mt-3 text-[15px] font-medium text-slate-500">
+            Work Today. Grow Tomorrow.
+          </p>
+        </motion.div>
+
+        {/* Value proposition + illustration */}
+        <motion.div
+          initial={{ opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1, duration: 0.45, ease: 'easeOut' }}
+          className="mt-8 flex items-center gap-1"
+        >
+          <div className="w-[52%] shrink-0">
+            <h1 className="font-display text-[28px] font-extrabold leading-[1.14] tracking-[-0.025em] text-[#0f1a33]">
+              Smarter Payments for{' '}
+              <span className="text-[#0064f0]">Growing Shops</span>
+            </h1>
+            <p className="mt-4 text-[14px] leading-[1.6] text-slate-500">
+              Accept payments, track sales and manage your shop — all in one simple app.
+            </p>
+          </div>
+          <motion.div
+            animate={{ y: [0, -6, 0] }}
+            transition={{ duration: 5.5, repeat: Infinity, ease: 'easeInOut' }}
+            className="-mr-5 w-[52%] min-w-0"
+          >
+            <ShopScene className="h-auto w-full" />
+          </motion.div>
+        </motion.div>
+
+        {/* Feature strip */}
+        <motion.div
+          initial={{ opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.18, duration: 0.45, ease: 'easeOut' }}
+          className="mt-8 flex items-start"
+        >
+          {FEATURES.map(({ icon: Icon, top, bottom }, index) => (
+            <Fragment key={bottom}>
+              {index > 0 && <div className="mt-3 h-14 w-px shrink-0 bg-slate-200" />}
+              <div className="flex flex-1 flex-col items-center gap-2.5 px-1 text-center">
+                <span className="flex h-[54px] w-[54px] items-center justify-center rounded-[17px] bg-[#e7f0ff] shadow-[0_6px_18px_rgba(0,100,240,0.10)]">
+                  <Icon className="h-[26px] w-[26px] text-[#0064f0]" strokeWidth={2.1} />
+                </span>
+                <span className="text-[12.5px] font-medium leading-[1.35] text-slate-600">
+                  {top}
+                  <br />
+                  {bottom}
+                </span>
+              </div>
+            </Fragment>
+          ))}
+        </motion.div>
+
+        {/* Sign in */}
+        <motion.div
+          initial={{ opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.26, duration: 0.45, ease: 'easeOut' }}
+          className="mt-auto pt-9"
         >
           {error && (
-            <div className="mb-3 whitespace-pre-line rounded-2xl border border-red-100 bg-red-50 px-3 py-2 text-center text-sm text-red-700">
+            <div className="mb-4 whitespace-pre-line rounded-2xl border border-red-100 bg-red-50 px-4 py-2.5 text-center text-[13px] leading-relaxed text-red-700">
               {error}
             </div>
           )}
 
           {!googleReady && (
-            <div className="mb-3 rounded-2xl border border-amber-100 bg-amber-50 px-3 py-2 text-center text-xs text-amber-800">
+            <div className="mb-4 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-2.5 text-center text-[12px] text-amber-800">
               Set <code className="font-semibold">VITE_GOOGLE_CLIENT_ID</code> in{' '}
               <code>.env</code> and restart the app.
             </div>
           )}
 
-          <Button
-            className="h-[56px] w-full justify-between rounded-[18px] bg-[#0064f0] px-3.5 text-[15px] font-semibold shadow-[0_14px_32px_rgba(0,100,240,0.38)] hover:bg-[#0056d6]"
-            size="lg"
-            loading={authBusy}
-            disabled={!googleReady}
+          <button
+            type="button"
             onClick={() => void handleGoogle()}
+            disabled={!googleReady || authBusy}
+            className={cn(
+              'relative flex h-[68px] w-full items-center justify-center rounded-full bg-white ring-1 ring-slate-100/90',
+              'shadow-[0_16px_40px_rgba(18,50,110,0.13)] transition',
+              'hover:shadow-[0_18px_46px_rgba(18,50,110,0.2)] active:scale-[0.99]',
+              'disabled:cursor-not-allowed disabled:opacity-60',
+            )}
           >
-            <span className="flex items-center gap-3">
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white shadow-sm">
-                <GoogleGlyph />
-              </span>
-              Continue with Google
+            <span className="absolute left-[22px] flex items-center">
+              <GoogleGlyph className="h-[30px] w-[30px]" />
             </span>
-            <ArrowRight className="mr-1 h-5 w-5" strokeWidth={2.25} />
-          </Button>
+            <span className="font-display text-[17.5px] font-bold tracking-[-0.01em] text-[#0f1a33]">
+              {authBusy ? 'Signing you in…' : 'Continue with Google'}
+            </span>
+            <span className="absolute right-[26px] flex items-center text-[#0f1a33]">
+              {authBusy ? (
+                <Loader2 className="h-5 w-5 animate-spin" strokeWidth={2.4} />
+              ) : (
+                <ArrowRight className="h-[22px] w-[22px]" strokeWidth={2.3} />
+              )}
+            </span>
+          </button>
 
-          <div className="mt-5 grid grid-cols-3 divide-x divide-slate-200">
-            {TRUST.map(({ icon: Icon, label }) => (
-              <div key={label} className="flex flex-col items-center gap-1.5 px-2 text-center">
-                <Icon className="h-4 w-4 text-[#0064f0]" strokeWidth={2.25} />
-                <span className="text-[10px] font-medium leading-snug text-slate-500">
-                  {label}
-                </span>
-              </div>
-            ))}
+          <div className="mt-5 flex items-center gap-3">
+            <span className="h-px flex-1 bg-slate-200" />
+            <span className="text-[11.5px] font-medium text-slate-400">
+              Trusted by thousands of shop owners
+            </span>
+            <span className="h-px flex-1 bg-slate-200" />
           </div>
-
-          <p className="mt-5 text-center text-[12px] font-medium text-slate-400">
-            Work Today. Grow Tomorrow.
-          </p>
 
           <div className="mt-3 flex justify-center gap-3 text-[10px] text-slate-300">
             <button
               type="button"
               onClick={() => void handleDemo('owner')}
-              className="hover:text-slate-500"
+              className="transition hover:text-slate-500"
             >
               Demo Owner
             </button>
@@ -307,13 +385,13 @@ export function LoginPage() {
             <button
               type="button"
               onClick={() => void handleDemo('worker')}
-              className="hover:text-slate-500"
+              className="transition hover:text-slate-500"
             >
               Demo Worker
             </button>
           </div>
         </motion.div>
-      </section>
+      </div>
     </div>
   )
 }
