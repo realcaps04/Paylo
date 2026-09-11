@@ -14,7 +14,10 @@ export function googleSetupHint() {
   return (
     `Add these in Google Cloud → Credentials → your Web OAuth client:\n` +
     `• Authorized JavaScript origins: ${origin}\n` +
-    `• Authorized redirect URIs: ${redirect}`
+    `• Authorized redirect URIs: ${redirect}\n\n` +
+    `To show “Paylo” instead of the domain on the account picker:\n` +
+    `Google Cloud → Google Auth Platform → Branding → App name = Paylo,\n` +
+    `then submit Brand verification (unverified apps always show the domain).`
   )
 }
 

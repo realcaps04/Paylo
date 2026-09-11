@@ -205,15 +205,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return next
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Google sign-in failed'
-        if (
-          message.includes('origin') ||
-          message.includes('redirect') ||
-          message.includes('400') ||
-          message.includes('missing_token')
-        ) {
-          setError(`${message}\n\n${googleSetupHint()}`)
-        } else {
-          setError(message)
+        if (!/cancelled/i.test(message)) {
+          if (
+            message.includes('origin') ||
+            message.includes('redirect') ||
+            message.includes('400') ||
+            message.includes('missing_token')
+          ) {
+            setError(`${message}\n\n${googleSetupHint()}`)
+          } else {
+            setError(message)
+          }
         }
         throw err
       } finally {
@@ -270,6 +272,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           activeShopId: existing.shopIds[0] ?? null,
           workerId: existing.workerId,
           onboarded: true,
+          roleChosen: true,
         })
         setBusy(false)
         return
@@ -286,6 +289,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         activeShopId: pick.shopIds[0] ?? null,
         workerId: pick.workerId,
         onboarded: true,
+        roleChosen: true,
       })
       setBusy(false)
     },

@@ -7,6 +7,8 @@ import { AppShell } from '@/components/layout/AppShell'
 import { InstallPrompt } from '@/components/pwa/InstallPrompt'
 import { MandatoryUpdateModal } from '@/components/pwa/MandatoryUpdateModal'
 import { LoginPage } from '@/pages/LoginPage'
+import { ChooseRolePage } from '@/pages/onboarding/ChooseRolePage'
+import { JoinShopPage } from '@/pages/onboarding/JoinShopPage'
 import { OnboardingWizard } from '@/pages/onboarding/OnboardingWizard'
 import { DashboardPage } from '@/pages/DashboardPage'
 import { AddWorkPage } from '@/pages/AddWorkPage'
@@ -22,6 +24,7 @@ import { SettingsPage } from '@/pages/SettingsPage'
 import { MorePage } from '@/pages/MorePage'
 import { SearchPage } from '@/pages/SearchPage'
 import { Skeleton } from '@/components/ui'
+import { onboardingPath } from '@/lib/onboardingPath'
 import type { ReactNode } from 'react'
 
 function FullScreenLoader() {
@@ -29,7 +32,7 @@ function FullScreenLoader() {
     <div className="flex min-h-dvh items-center justify-center bg-white p-6">
       <div className="w-full max-w-sm space-y-3">
         <Skeleton className="mx-auto h-12 w-12 rounded-xl" />
-        <Skeleton className="h-4 w-2/3 mx-auto" />
+        <Skeleton className="mx-auto h-4 w-2/3" />
         <Skeleton className="h-24 w-full rounded-card" />
       </div>
     </div>
@@ -46,7 +49,7 @@ function RequireAuth({ children }: { children: ReactNode }) {
 function RequireOnboarded({ children }: { children: ReactNode }) {
   const { session } = useAuth()
   if (!session?.onboarded || !session.activeShopId) {
-    return <Navigate to="/onboarding" replace />
+    return <Navigate to={onboardingPath(session)} replace />
   }
   return children
 }
@@ -56,9 +59,53 @@ function PublicOnly({ children }: { children: ReactNode }) {
   if (loading) return <FullScreenLoader />
   if (session) {
     if (!session.onboarded || !session.activeShopId) {
-      return <Navigate to="/onboarding" replace />
+      return <Navigate to={onboardingPath(session)} replace />
     }
     return <Navigate to="/app" replace />
+  }
+  return children
+}
+
+function RequireRoleChoice({ children }: { children: ReactNode }) {
+  const { session } = useAuth()
+  if (session?.onboarded && session.activeShopId) {
+    return <Navigate to="/app" replace />
+  }
+  if (session?.roleChosen) {
+    return (
+      <Navigate
+        to={session.role === 'worker' ? '/onboarding/join' : '/onboarding'}
+        replace
+      />
+    )
+  }
+  return children
+}
+
+function RequireOwnerOnboarding({ children }: { children: ReactNode }) {
+  const { session } = useAuth()
+  if (session?.onboarded && session.activeShopId) {
+    return <Navigate to="/app" replace />
+  }
+  if (!session?.roleChosen) {
+    return <Navigate to="/onboarding/role" replace />
+  }
+  if (session.role === 'worker') {
+    return <Navigate to="/onboarding/join" replace />
+  }
+  return children
+}
+
+function RequireStaffJoin({ children }: { children: ReactNode }) {
+  const { session } = useAuth()
+  if (session?.onboarded && session.activeShopId) {
+    return <Navigate to="/app" replace />
+  }
+  if (!session?.roleChosen) {
+    return <Navigate to="/onboarding/role" replace />
+  }
+  if (session.role !== 'worker') {
+    return <Navigate to="/onboarding" replace />
   }
   return children
 }
@@ -75,10 +122,32 @@ function AppRoutes() {
         }
       />
       <Route
+        path="/onboarding/role"
+        element={
+          <RequireAuth>
+            <RequireRoleChoice>
+              <ChooseRolePage />
+            </RequireRoleChoice>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/onboarding/join"
+        element={
+          <RequireAuth>
+            <RequireStaffJoin>
+              <JoinShopPage />
+            </RequireStaffJoin>
+          </RequireAuth>
+        }
+      />
+      <Route
         path="/onboarding"
         element={
           <RequireAuth>
-            <OnboardingWizard />
+            <RequireOwnerOnboarding>
+              <OnboardingWizard />
+            </RequireOwnerOnboarding>
           </RequireAuth>
         }
       />

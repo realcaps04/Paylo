@@ -1,4 +1,4 @@
-import { Fragment } from 'react'
+import { Fragment, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
   ArrowRight,
@@ -9,8 +9,9 @@ import {
   Store,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { LogoMark } from '@/components/ui'
+import { Button, LogoMark, Modal } from '@/components/ui'
 import { useAuth } from '@/context/AuthContext'
+import { onboardingPath } from '@/lib/onboardingPath'
 import { cn } from '@/lib/cn'
 
 function GoogleGlyph({ className }: { className?: string }) {
@@ -37,7 +38,7 @@ function GoogleGlyph({ className }: { className?: string }) {
 }
 
 const FEATURES = [
-  { icon: CreditCard, top: 'Accept', bottom: 'Payments' },
+  { icon: CreditCard, top: 'Record', bottom: 'Payments' },
   { icon: BarChart3, top: 'Track', bottom: 'Your Sales' },
   { icon: Store, top: 'Grow', bottom: 'Your Shop' },
 ] as const
@@ -212,15 +213,24 @@ export function LoginPage() {
     useAuth()
   const navigate = useNavigate()
   const authBusy = busy || loading
+  const [cancelOpen, setCancelOpen] = useState(false)
 
   const handleGoogle = async () => {
     clearError()
+    setCancelOpen(false)
     try {
       const session = await loginWithGoogle({ intent: 'login' })
-      if (!session.onboarded || session.shopIds.length === 0) navigate('/onboarding')
-      else navigate('/app')
-    } catch {
-      // surfaced through auth context
+      if (!session.onboarded || session.shopIds.length === 0) {
+        navigate(onboardingPath(session))
+      } else {
+        navigate('/app')
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : ''
+      if (/cancelled/i.test(message)) {
+        clearError()
+        setCancelOpen(true)
+      }
     }
   }
 
@@ -230,8 +240,24 @@ export function LoginPage() {
     navigate('/app')
   }
 
+  const setupError = error && !/cancelled/i.test(error) ? error : null
+
   return (
     <div className="relative flex min-h-dvh flex-col overflow-x-hidden bg-[#fcfdff]">
+      <Modal
+        open={cancelOpen}
+        onClose={() => setCancelOpen(false)}
+        title="Sign-in cancelled"
+        footer={
+          <Button className="w-full sm:w-auto" onClick={() => setCancelOpen(false)}>
+            OK
+          </Button>
+        }
+      >
+        <p className="text-sm leading-relaxed text-ink-muted">
+          Google sign-in was cancelled. You can try again whenever you&apos;re ready.
+        </p>
+      </Modal>
       {/* Soft brand background */}
       <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -left-28 -top-24 h-80 w-80 rounded-full bg-[#e4efff] blur-[64px]" />
@@ -241,161 +267,166 @@ export function LoginPage() {
         <div className="absolute bottom-16 -left-20 h-44 w-44 rounded-full bg-[#eff5ff] blur-[50px]" />
       </div>
 
-      <div className="relative z-10 mx-auto flex w-full max-w-[440px] flex-1 flex-col px-6 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] pt-[calc(env(safe-area-inset-top)+1rem)]">
+      <div className="relative z-10 mx-auto flex w-full max-w-[440px] flex-1 flex-col px-5 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-[calc(env(safe-area-inset-top)+0.35rem)]">
         {/* Need help */}
         <div className="flex justify-end">
           <a
             href="mailto:support@paylo.app?subject=Paylo%20Help"
-            className="inline-flex items-center gap-2 rounded-full px-1 py-1 text-[13px] font-medium text-slate-600 transition hover:text-[#0064f0]"
+            className="inline-flex items-center gap-2 rounded-full px-1 py-0.5 text-[12.5px] font-medium text-slate-600 transition hover:text-[#0064f0]"
           >
-            <Headphones className="h-[18px] w-[18px] text-[#3d5675]" strokeWidth={2.1} />
+            <Headphones className="h-4 w-4 text-[#3d5675]" strokeWidth={2.1} />
             Need Help?
           </a>
         </div>
 
-        {/* Brand */}
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.45, ease: 'easeOut' }}
-          className="mt-3 flex flex-col items-center"
-        >
-          <LogoMark size="2xl" className="drop-shadow-[0_18px_36px_rgba(0,86,214,0.22)]" />
-          <div className="mt-4 flex items-baseline justify-center">
-            <img
-              src="/paylo-p-glyph.png"
-              alt=""
-              aria-hidden
-              className="h-[52px] w-auto translate-y-[10px] select-none"
-            />
-            <span className="font-display text-[46px] font-extrabold leading-none tracking-[-0.03em] text-[#0f1a33]">
-              aylo
-            </span>
-          </div>
-          <p className="mt-3 text-[15px] font-medium text-slate-500">
-            Work Today. Grow Tomorrow.
-          </p>
-        </motion.div>
-
-        {/* Value proposition + illustration */}
-        <motion.div
-          initial={{ opacity: 0, y: 14 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1, duration: 0.45, ease: 'easeOut' }}
-          className="mt-8 flex items-center gap-1"
-        >
-          <div className="w-[53%] shrink-0">
-            <h1 className="font-display text-[28px] font-extrabold leading-[1.14] tracking-[-0.025em] text-[#0f1a33]">
-              Smarter Payments for{' '}
-              <span className="text-[#0064f0]">Growing Shops</span>
-            </h1>
-            <p className="mt-4 text-[14px] leading-[1.6] text-slate-500">
-              Accept payments, track sales and manage your shop — all in one simple app.
-            </p>
-          </div>
+        {/* Spread sections evenly so the page isn't top-heavy */}
+        <div className="flex flex-1 flex-col justify-between gap-4 py-1">
+          {/* Brand */}
           <motion.div
-            animate={{ y: [0, -6, 0] }}
-            transition={{ duration: 5.5, repeat: Infinity, ease: 'easeInOut' }}
-            className="-mr-6 w-[47%] min-w-0"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.45, ease: 'easeOut' }}
+            className="flex flex-col items-center"
           >
-            <ShopScene className="h-auto w-full" />
+            <LogoMark size="lg" className="h-[64px] w-[64px]" />
+            <div className="mt-2 flex items-baseline justify-center">
+              <img
+                src="/paylo-p-glyph.png"
+                alt=""
+                aria-hidden
+                className="h-[32px] w-auto translate-y-[6px] select-none"
+              />
+              <span className="font-display text-[30px] font-extrabold leading-none tracking-[-0.03em] text-[#0f1a33]">
+                aylo
+              </span>
+            </div>
+            <p className="mt-1.5 text-[12.5px] font-medium text-slate-500">
+              Work Today. Grow Tomorrow.
+            </p>
           </motion.div>
-        </motion.div>
 
-        {/* Feature strip */}
-        <motion.div
-          initial={{ opacity: 0, y: 14 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.18, duration: 0.45, ease: 'easeOut' }}
-          className="mt-8 flex items-start"
-        >
-          {FEATURES.map(({ icon: Icon, top, bottom }, index) => (
-            <Fragment key={bottom}>
-              {index > 0 && <div className="mt-3 h-14 w-px shrink-0 bg-slate-200" />}
-              <div className="flex flex-1 flex-col items-center gap-2.5 px-1 text-center">
-                <span className="flex h-[54px] w-[54px] items-center justify-center rounded-[17px] bg-[#e7f0ff] shadow-[0_6px_18px_rgba(0,100,240,0.10)]">
-                  <Icon className="h-[26px] w-[26px] text-[#0064f0]" strokeWidth={2.1} />
-                </span>
-                <span className="text-[12.5px] font-medium leading-[1.35] text-slate-600">
-                  {top}
-                  <br />
-                  {bottom}
-                </span>
-              </div>
-            </Fragment>
-          ))}
-        </motion.div>
-
-        {/* Sign in */}
-        <motion.div
-          initial={{ opacity: 0, y: 14 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.26, duration: 0.45, ease: 'easeOut' }}
-          className="mt-auto pt-9"
-        >
-          {error && (
-            <div className="mb-4 whitespace-pre-line rounded-2xl border border-red-100 bg-red-50 px-4 py-2.5 text-center text-[13px] leading-relaxed text-red-700">
-              {error}
-            </div>
-          )}
-
-          {!googleReady && (
-            <div className="mb-4 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-2.5 text-center text-[12px] text-amber-800">
-              Set <code className="font-semibold">VITE_GOOGLE_CLIENT_ID</code> in{' '}
-              <code>.env</code> and restart the app.
-            </div>
-          )}
-
-          <button
-            type="button"
-            onClick={() => void handleGoogle()}
-            disabled={!googleReady || authBusy}
-            className={cn(
-              'grid h-[68px] w-full grid-cols-[30px_1fr_30px] items-center gap-3 rounded-full bg-white px-[22px]',
-              'ring-1 ring-slate-100/90 shadow-[0_16px_40px_rgba(18,50,110,0.13)] transition',
-              'hover:shadow-[0_18px_46px_rgba(18,50,110,0.2)] active:scale-[0.99]',
-              'disabled:cursor-not-allowed disabled:opacity-60',
-            )}
+          {/* Value proposition + illustration */}
+          <motion.div
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1, duration: 0.45, ease: 'easeOut' }}
+            className="relative flex min-h-[148px] items-center"
           >
-            <GoogleGlyph className="h-[30px] w-[30px]" />
-            <span className="whitespace-nowrap text-center font-display text-[16.5px] font-bold tracking-[-0.01em] text-[#0f1a33]">
-              {authBusy ? 'Signing you in…' : 'Continue with Google'}
-            </span>
-            <span className="flex items-center justify-end text-[#0f1a33]">
-              {authBusy ? (
-                <Loader2 className="h-5 w-5 animate-spin" strokeWidth={2.4} />
-              ) : (
-                <ArrowRight className="h-[22px] w-[22px]" strokeWidth={2.3} />
+            <div className="relative z-20 w-[62%] pr-2">
+              <h1 className="font-display text-[25px] font-extrabold leading-[1.2] tracking-[-0.025em] text-[#0f1a33]">
+                Smarter Payments for
+                <br />
+                <span className="text-[#0064f0]">Growing Shops</span>
+              </h1>
+              <p className="mt-3 max-w-[220px] text-[13px] leading-[1.5] text-slate-500">
+                Accept payments, track sales and manage your shop —
+                <br />
+                all in one simple app.
+              </p>
+            </div>
+            <motion.div
+              animate={{ y: [0, -6, 0] }}
+              transition={{ duration: 5.5, repeat: Infinity, ease: 'easeInOut' }}
+              className="absolute -right-3 top-1/2 z-10 w-[48%] -translate-y-1/2"
+            >
+              <ShopScene className="h-auto w-full" />
+            </motion.div>
+          </motion.div>
+
+          {/* Feature strip */}
+          <motion.div
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.18, duration: 0.45, ease: 'easeOut' }}
+            className="flex items-start"
+          >
+            {FEATURES.map(({ icon: Icon, top, bottom }, index) => (
+              <Fragment key={bottom}>
+                {index > 0 && <div className="mt-2.5 h-12 w-px shrink-0 bg-slate-200" />}
+                <div className="flex flex-1 flex-col items-center gap-2 px-1 text-center">
+                  <span className="flex h-[46px] w-[46px] items-center justify-center rounded-[15px] bg-[#e7f0ff] shadow-[0_6px_18px_rgba(0,100,240,0.10)]">
+                    <Icon className="h-[22px] w-[22px] text-[#0064f0]" strokeWidth={2.1} />
+                  </span>
+                  <span className="text-[12px] font-medium leading-[1.35] text-slate-600">
+                    {top}
+                    <br />
+                    {bottom}
+                  </span>
+                </div>
+              </Fragment>
+            ))}
+          </motion.div>
+
+          {/* Sign in */}
+          <motion.div
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.26, duration: 0.45, ease: 'easeOut' }}
+          >
+            {setupError && (
+              <div className="mb-3 whitespace-pre-line rounded-2xl border border-red-100 bg-red-50 px-4 py-2.5 text-center text-[13px] leading-relaxed text-red-700">
+                {setupError}
+              </div>
+            )}
+
+            {!googleReady && (
+              <div className="mb-3 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-2.5 text-center text-[12px] text-amber-800">
+                Set <code className="font-semibold">VITE_GOOGLE_CLIENT_ID</code> in{' '}
+                <code>.env</code> and restart the app.
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => void handleGoogle()}
+              disabled={!googleReady || authBusy}
+              className={cn(
+                'grid h-[52px] w-full grid-cols-[24px_1fr_24px] items-center gap-2.5 rounded-full bg-white px-4',
+                'ring-1 ring-slate-100/90 shadow-[0_12px_28px_rgba(18,50,110,0.12)] transition',
+                'hover:shadow-[0_14px_34px_rgba(18,50,110,0.18)] active:scale-[0.99]',
+                'disabled:cursor-not-allowed disabled:opacity-60',
               )}
-            </span>
-          </button>
-
-          <div className="mt-5 flex items-center gap-3">
-            <span className="h-px flex-1 bg-slate-200" />
-            <span className="text-[11.5px] font-medium text-slate-400">
-              Trusted by thousands of shop owners
-            </span>
-            <span className="h-px flex-1 bg-slate-200" />
-          </div>
-
-          <div className="mt-3 flex justify-center gap-3 text-[10px] text-slate-300">
-            <button
-              type="button"
-              onClick={() => void handleDemo('owner')}
-              className="transition hover:text-slate-500"
             >
-              Demo Owner
+              <GoogleGlyph className="h-6 w-6" />
+              <span className="whitespace-nowrap text-center font-display text-[15px] font-bold tracking-[-0.01em] text-[#0f1a33]">
+                {authBusy ? 'Signing you in…' : 'Continue with Google'}
+              </span>
+              <span className="flex items-center justify-end text-[#0f1a33]">
+                {authBusy ? (
+                  <Loader2 className="h-4 w-4 animate-spin" strokeWidth={2.4} />
+                ) : (
+                  <ArrowRight className="h-5 w-5" strokeWidth={2.3} />
+                )}
+              </span>
             </button>
-            <span>·</span>
-            <button
-              type="button"
-              onClick={() => void handleDemo('worker')}
-              className="transition hover:text-slate-500"
-            >
-              Demo Worker
-            </button>
-          </div>
-        </motion.div>
+
+            <div className="mt-4 flex items-center gap-3">
+              <span className="h-px flex-1 bg-slate-200" />
+              <span className="text-[11px] font-medium text-slate-400">
+                Trusted by thousands of shop owners
+              </span>
+              <span className="h-px flex-1 bg-slate-200" />
+            </div>
+
+            <div className="mt-2.5 flex justify-center gap-3 text-[10px] text-slate-300">
+              <button
+                type="button"
+                onClick={() => void handleDemo('owner')}
+                className="transition hover:text-slate-500"
+              >
+                Demo Owner
+              </button>
+              <span>·</span>
+              <button
+                type="button"
+                onClick={() => void handleDemo('worker')}
+                className="transition hover:text-slate-500"
+              >
+                Demo Worker
+              </button>
+            </div>
+          </motion.div>
+        </div>
       </div>
     </div>
   )

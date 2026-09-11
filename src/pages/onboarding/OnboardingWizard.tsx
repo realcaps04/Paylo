@@ -59,7 +59,7 @@ type DraftWorker = {
 
 export function OnboardingWizard() {
   const navigate = useNavigate()
-  const { session, attachShop, setOnboarded } = useAuth()
+  const { session, attachShop, setOnboarded, clearRoleChoice, logout } = useAuth()
   const { addShop, addWorker, addService } = useShop()
   const { setShowInstallHint } = usePwa()
   const { toast } = useToast()
@@ -216,12 +216,42 @@ export function OnboardingWizard() {
   return (
     <div className="min-h-dvh bg-white">
       <div className="mx-auto max-w-3xl px-4 py-8 md:py-12">
-        <div className="mb-8 flex items-center justify-between">
-          <Logo />
-          <p className="text-sm text-ink-muted">
-            Step {step} of {STEPS.length}
-          </p>
+        <div className="mb-8 flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2">
+            {step === 1 && (
+              <button
+                type="button"
+                aria-label="Back to role"
+                onClick={() => {
+                  clearRoleChoice()
+                  navigate('/onboarding/role')
+                }}
+                className="mr-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-ink hover:bg-slate-100"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </button>
+            )}
+            <Logo />
+          </div>
+          <div className="flex shrink-0 items-center gap-3">
+            <p className="hidden text-sm text-ink-muted sm:block">
+              Step {step} of {STEPS.length}
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                logout()
+                navigate('/login')
+              }}
+              className="rounded-full border border-slate-200 px-3 py-1.5 text-[12px] font-semibold text-slate-600 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600"
+            >
+              Sign out
+            </button>
+          </div>
         </div>
+        <p className="mb-4 text-sm text-ink-muted sm:hidden">
+          Step {step} of {STEPS.length}
+        </p>
 
         <div className="mb-8 flex gap-2 overflow-x-auto pb-1">
           {STEPS.map((s) => (

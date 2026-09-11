@@ -152,6 +152,16 @@ export function ChooseRolePage() {
             <ArrowLeft className="h-5 w-5" strokeWidth={2.2} />
           </button>
           <ProgressDots active={1} />
+          <button
+            type="button"
+            onClick={() => {
+              logout()
+              navigate('/login')
+            }}
+            className="rounded-full border border-slate-200 px-3 py-1.5 text-[12px] font-semibold text-slate-600 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600"
+          >
+            Sign out
+          </button>
         </div>
 
         <motion.div
