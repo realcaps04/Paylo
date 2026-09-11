@@ -16,6 +16,11 @@ import {
 } from '@/lib/googleAuth'
 import { convex, convexReady } from '@/lib/convex'
 import { api } from '../../convex/_generated/api'
+import {
+  buildReturningSession,
+  fetchCloudMembership,
+  isReturningMember,
+} from '@/lib/restoreSession'
 import { loadJSON, removeKey, saveJSON } from '@/lib/storage'
 import { uid } from '@/lib/format'
 import { createDemoStore } from '@/data/demo'
@@ -101,6 +106,15 @@ function ensureDemoData() {
   }
 }
 
+function initials(name: string) {
+  return name
+    .split(' ')
+    .map((n) => n[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase()
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<AuthSession | null>(null)
   const [loading, setLoading] = useState(true)
@@ -109,9 +123,82 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const googleReady = Boolean(getGoogleClientId())
 
   useEffect(() => {
-    const saved = loadJSON<AuthSession | null>('session', null)
-    setSession(saved)
-    setLoading(false)
+    let cancelled = false
+    void (async () => {
+      const saved = loadJSON<AuthSession | null>('session', null)
+      if (!saved) {
+        if (!cancelled) {
+          setSession(null)
+          setLoading(false)
+        }
+        return
+      }
+
+      let next = saved
+      const needsRestore = !saved.onboarded || !saved.activeShopId || saved.shopIds.length === 0
+      if (needsRestore && saved.user.email) {
+        const { user, shop } = await fetchCloudMembership(saved.user.email)
+        if (isReturningMember({ cloudUser: user, cloudShop: shop })) {
+          next = buildReturningSession({
+            profile: {
+              id: saved.user.id,
+              name: saved.user.name || user?.name || 'User',
+              email: saved.user.email,
+              picture: saved.user.picture ?? user?.picture,
+            },
+            provider: saved.user.provider === 'email' ? 'email' : 'google',
+            local: {
+              userId: saved.user.id,
+              role: saved.role,
+              shopIds: saved.shopIds,
+              workerId: saved.workerId,
+            },
+            cloudUser: user,
+            cloudShop: shop,
+          })
+          saveJSON('session', next)
+          syncAccountFromSession({
+            userId: next.user.id,
+            email: next.user.email,
+            name: next.user.name,
+            picture: next.user.picture ?? null,
+            role: next.role,
+            shopIds: next.shopIds,
+            workerId: next.workerId,
+            onboarded: next.onboarded,
+          })
+        }
+      } else if (saved.onboarded && saved.user.email) {
+        const { shop } = await fetchCloudMembership(saved.user.email)
+        if (shop) {
+          buildReturningSession({
+            profile: {
+              id: saved.user.id,
+              name: saved.user.name,
+              email: saved.user.email,
+              picture: saved.user.picture,
+            },
+            provider: saved.user.provider === 'email' ? 'email' : 'google',
+            local: {
+              userId: saved.user.id,
+              role: saved.role,
+              shopIds: saved.shopIds,
+              workerId: saved.workerId,
+            },
+            cloudUser: null,
+            cloudShop: shop,
+          })
+        }
+      }
+
+      if (!cancelled) {
+        setSession(next)
+        setLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   const persist = useCallback((next: AuthSession | null) => {
@@ -142,68 +229,74 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const profile = await signInWithGooglePopup()
         const existing = getAccountByEmail(profile.email)
+        const { user: cloudUser, shop: cloudShop } = await fetchCloudMembership(profile.email)
+
+        const returning = isReturningMember({
+          localOnboarded: existing?.onboarded,
+          localShopIds: existing?.shopIds,
+          cloudUser,
+          cloudShop,
+        })
+
+        // Existing shop owners always skip onboarding — even if UI said "signup"
+        if (returning) {
+          const next = buildReturningSession({
+            profile,
+            provider: 'google',
+            local: existing
+              ? {
+                  userId: existing.userId,
+                  role: existing.role,
+                  shopIds: existing.shopIds,
+                  workerId: existing.workerId,
+                }
+              : null,
+            cloudUser,
+            cloudShop,
+          })
+
+          if (convexReady && convex) {
+            try {
+              await convex.mutation(api.users.upsertByEmail, {
+                email: profile.email,
+                name: profile.name,
+                picture: profile.picture,
+                googleId: profile.id,
+                role: next.role,
+              })
+            } catch {
+              // Local auth still works if Convex is briefly unreachable
+            }
+          }
+
+          persist(next)
+          return next
+        }
 
         const forceSignup = opts?.intent === 'signup'
-        const hasShop =
-          !forceSignup &&
-          Boolean(existing?.onboarded && existing.shopIds.length > 0)
+        const next: AuthSession = {
+          user: {
+            id: profile.id,
+            name: profile.name,
+            email: profile.email,
+            avatar: initials(profile.name),
+            picture: profile.picture,
+            provider: 'google',
+          },
+          role: 'owner',
+          shopIds: forceSignup ? [] : existing?.shopIds ?? [],
+          activeShopId: forceSignup ? null : existing?.shopIds?.[0] ?? null,
+          workerId: forceSignup ? undefined : existing?.workerId,
+          onboarded: false,
+          roleChosen: false,
+        }
 
-        const next: AuthSession = hasShop && existing
-          ? {
-              user: {
-                id: existing.userId || profile.id,
-                name: profile.name || existing.name,
-                email: profile.email,
-                avatar: profile.name
-                  .split(' ')
-                  .map((n) => n[0])
-                  .join('')
-                  .slice(0, 2)
-                  .toUpperCase(),
-                picture: profile.picture,
-                provider: 'google',
-              },
-              role: existing.role,
-              shopIds: [...existing.shopIds],
-              activeShopId: existing.shopIds[0] ?? null,
-              workerId: existing.workerId,
-              onboarded: true,
-              roleChosen: true,
-            }
-          : {
-              user: {
-                id: profile.id,
-                name: profile.name,
-                email: profile.email,
-                avatar: profile.name
-                  .split(' ')
-                  .map((n) => n[0])
-                  .join('')
-                  .slice(0, 2)
-                  .toUpperCase(),
-                picture: profile.picture,
-                provider: 'google',
-              },
-              role: 'owner',
-              shopIds: forceSignup ? [] : existing?.shopIds ?? [],
-              activeShopId: forceSignup
-                ? null
-                : existing?.shopIds?.[0] ?? null,
-              workerId: forceSignup ? undefined : existing?.workerId,
-              onboarded: forceSignup
-                ? false
-                : Boolean(existing?.onboarded && (existing.shopIds?.length ?? 0) > 0),
-              roleChosen: false,
-            }
-
-        // Fresh Google users with no shop start role selection + onboarding
         if (!next.shopIds.length) {
           next.onboarded = false
           next.activeShopId = null
           next.roleChosen = false
         }
 
-        // Record / update the user in Convex keyed by Google email
         if (convexReady && convex) {
           try {
             await convex.mutation(api.users.upsertByEmail, {
@@ -275,22 +368,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       const existing = getAccountByEmail(email)
-      if (existing?.onboarded && existing.shopIds.length) {
-        persist({
-          user: {
-            id: existing.userId,
-            name: existing.name,
-            email: existing.email,
-            picture: existing.picture ?? undefined,
-            provider: 'email',
-          },
-          role: existing.role,
-          shopIds: [...existing.shopIds],
-          activeShopId: existing.shopIds[0] ?? null,
-          workerId: existing.workerId,
-          onboarded: true,
-          roleChosen: true,
+      const { user: cloudUser, shop: cloudShop } = await fetchCloudMembership(email)
+
+      if (
+        isReturningMember({
+          localOnboarded: existing?.onboarded,
+          localShopIds: existing?.shopIds,
+          cloudUser,
+          cloudShop,
         })
+      ) {
+        persist(
+          buildReturningSession({
+            profile: {
+              id: existing?.userId || uid('u'),
+              name: existing?.name || cloudUser?.name || email.split('@')[0],
+              email,
+              picture: existing?.picture ?? cloudUser?.picture,
+            },
+            provider: 'email',
+            local: existing
+              ? {
+                  userId: existing.userId,
+                  role: existing.role,
+                  shopIds: existing.shopIds,
+                  workerId: existing.workerId,
+                }
+              : null,
+            cloudUser,
+            cloudShop,
+          }),
+        )
         setBusy(false)
         return
       }

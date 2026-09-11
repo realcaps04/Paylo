@@ -11,7 +11,7 @@ import {
 import { useNavigate } from 'react-router-dom'
 import { Button, LogoMark, Modal } from '@/components/ui'
 import { useAuth } from '@/context/AuthContext'
-import { onboardingPath } from '@/lib/onboardingPath'
+import { onboardingPath, isDashboardReady } from '@/lib/onboardingPath'
 import { cn } from '@/lib/cn'
 
 function GoogleGlyph({ className }: { className?: string }) {
@@ -220,11 +220,7 @@ export function LoginPage() {
     setCancelOpen(false)
     try {
       const session = await loginWithGoogle({ intent: 'login' })
-      if (!session.onboarded || session.shopIds.length === 0) {
-        navigate(onboardingPath(session))
-      } else {
-        navigate('/app')
-      }
+      navigate(isDashboardReady(session) ? '/app' : onboardingPath(session))
     } catch (err) {
       const message = err instanceof Error ? err.message : ''
       if (/cancelled/i.test(message)) {

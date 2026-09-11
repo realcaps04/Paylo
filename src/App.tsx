@@ -24,7 +24,7 @@ import { SettingsPage } from '@/pages/SettingsPage'
 import { MorePage } from '@/pages/MorePage'
 import { SearchPage } from '@/pages/SearchPage'
 import { Skeleton } from '@/components/ui'
-import { onboardingPath } from '@/lib/onboardingPath'
+import { onboardingPath, isDashboardReady } from '@/lib/onboardingPath'
 import type { ReactNode } from 'react'
 
 function FullScreenLoader() {
@@ -48,7 +48,7 @@ function RequireAuth({ children }: { children: ReactNode }) {
 
 function RequireOnboarded({ children }: { children: ReactNode }) {
   const { session } = useAuth()
-  if (!session?.onboarded || !session.activeShopId) {
+  if (!isDashboardReady(session)) {
     return <Navigate to={onboardingPath(session)} replace />
   }
   return children
@@ -58,17 +58,17 @@ function PublicOnly({ children }: { children: ReactNode }) {
   const { session, loading } = useAuth()
   if (loading) return <FullScreenLoader />
   if (session) {
-    if (!session.onboarded || !session.activeShopId) {
-      return <Navigate to={onboardingPath(session)} replace />
+    if (isDashboardReady(session)) {
+      return <Navigate to="/app" replace />
     }
-    return <Navigate to="/app" replace />
+    return <Navigate to={onboardingPath(session)} replace />
   }
   return children
 }
 
 function RequireRoleChoice({ children }: { children: ReactNode }) {
   const { session } = useAuth()
-  if (session?.onboarded && session.activeShopId) {
+  if (isDashboardReady(session)) {
     return <Navigate to="/app" replace />
   }
   if (session?.roleChosen) {
@@ -84,7 +84,7 @@ function RequireRoleChoice({ children }: { children: ReactNode }) {
 
 function RequireOwnerOnboarding({ children }: { children: ReactNode }) {
   const { session } = useAuth()
-  if (session?.onboarded && session.activeShopId) {
+  if (isDashboardReady(session)) {
     return <Navigate to="/app" replace />
   }
   if (!session?.roleChosen) {
@@ -98,7 +98,7 @@ function RequireOwnerOnboarding({ children }: { children: ReactNode }) {
 
 function RequireStaffJoin({ children }: { children: ReactNode }) {
   const { session } = useAuth()
-  if (session?.onboarded && session.activeShopId) {
+  if (isDashboardReady(session)) {
     return <Navigate to="/app" replace />
   }
   if (!session?.roleChosen) {

@@ -99,6 +99,15 @@ export function ShopProvider({ children }: { children: ReactNode }) {
   }, [store])
 
   useEffect(() => {
+    const onStoreUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<ShopStore>).detail
+      if (detail) setStore(detail)
+    }
+    window.addEventListener('paylo:store-updated', onStoreUpdated)
+    return () => window.removeEventListener('paylo:store-updated', onStoreUpdated)
+  }, [])
+
+  useEffect(() => {
     const on = () => setOnline(true)
     const off = () => setOnline(false)
     window.addEventListener('online', on)

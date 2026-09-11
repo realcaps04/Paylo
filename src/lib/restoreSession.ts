@@ -1,9 +1,11 @@
 import { api } from '../../convex/_generated/api'
-import { convex, convexReady } from '@/lib/convex'
-import { createEmptyStore, type ShopStore } from '@/data/demo'
+import { convexHttp, convexReady } from '@/lib/convex'
+import { createEmptyStore } from '@/data/demo'
 import { uid } from '@/lib/format'
 import { loadJSON, saveJSON } from '@/lib/storage'
 import type { AuthSession, Role, Shop } from '@/types'
+
+type ShopStore = ReturnType<typeof createEmptyStore>
 
 export type ConvexShopDoc = {
   _id: string
@@ -34,13 +36,13 @@ export async function fetchCloudMembership(email: string): Promise<{
   user: ConvexUserDoc | null
   shop: ConvexShopDoc | null
 }> {
-  if (!convexReady || !convex || !email.trim()) {
+  if (!convexReady || !convexHttp || !email.trim()) {
     return { user: null, shop: null }
   }
   try {
     const [user, shop] = await Promise.all([
-      convex.query(api.users.getByEmail, { email }),
-      convex.query(api.shops.getByOwnerEmail, { ownerEmail: email }),
+      convexHttp.query(api.users.getByEmail, { email }),
+      convexHttp.query(api.shops.getByOwnerEmail, { ownerEmail: email }),
     ])
     return {
       user: (user as ConvexUserDoc | null) ?? null,

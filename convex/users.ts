@@ -26,7 +26,8 @@ export const upsertByEmail = mutation({
         name: args.name || existing.name,
         picture: args.picture ?? existing.picture,
         googleId: args.googleId ?? existing.googleId,
-        role: args.role,
+        // Keep established role/onboarded for returning users
+        role: existing.onboarded ? existing.role : args.role,
         updatedAt: now,
       })
       return existing._id
