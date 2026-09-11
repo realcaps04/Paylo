@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { ClipboardList, ListFilter, Plus, X } from 'lucide-react'
+import { ClipboardList, ListFilter, X } from 'lucide-react'
 import { useShop } from '@/context/ShopContext'
 import {
   Badge,
@@ -112,27 +111,19 @@ export function TransactionsPage() {
         title="Transactions"
         subtitle="All billed work across your shop"
         actions={
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              onClick={openFilters}
-              className={cn(activeCount > 0 && 'border-[#0064f0]/40 bg-[#eef5ff] text-[#0064f0]')}
-            >
-              <ListFilter className="h-4 w-4" />
-              Filter
-              {activeCount > 0 && (
-                <span className="ml-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#0064f0] px-1.5 text-[11px] font-bold text-white">
-                  {activeCount}
-                </span>
-              )}
-            </Button>
-            <Link to="/app/work/new">
-              <Button>
-                <Plus className="h-4 w-4" />
-                Add Work
-              </Button>
-            </Link>
-          </div>
+          <Button
+            variant="outline"
+            onClick={openFilters}
+            className={cn(activeCount > 0 && 'border-[#0064f0]/40 bg-[#eef5ff] text-[#0064f0]')}
+          >
+            <ListFilter className="h-4 w-4" />
+            Filter
+            {activeCount > 0 && (
+              <span className="ml-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#0064f0] px-1.5 text-[11px] font-bold text-white">
+                {activeCount}
+              </span>
+            )}
+          </Button>
         }
       />
 
@@ -175,13 +166,8 @@ export function TransactionsPage() {
       {filtered.length === 0 ? (
         <EmptyState
           title="No transactions found"
-          description="Try a different filter or log a new job."
+          description="Try a different filter, or wait for staff to record sales."
           icon={<ClipboardList className="h-6 w-6" />}
-          action={
-            <Link to="/app/work/new">
-              <Button>Add Work</Button>
-            </Link>
-          }
         />
       ) : (
         <>

@@ -41,12 +41,14 @@ export function WorkRecordsPage() {
         title={isWorker ? 'My Work' : 'Work Records'}
         subtitle={isWorker ? 'Jobs you have logged' : 'All work across the shop'}
         actions={
-          <Link to="/app/work/new">
-            <Button>
-              <Plus className="h-4 w-4" />
-              Add Work
-            </Button>
-          </Link>
+          isWorker ? (
+            <Link to="/app/work/new">
+              <Button>
+                <Plus className="h-4 w-4" />
+                Add Work
+              </Button>
+            </Link>
+          ) : undefined
         }
       />
 
@@ -79,12 +81,18 @@ export function WorkRecordsPage() {
       {list.length === 0 ? (
         <EmptyState
           title="No work records"
-          description="Log your first job to see it here."
+          description={
+            isWorker
+              ? 'Log your first job to see it here.'
+              : 'Sales recorded by your staff will show up here.'
+          }
           icon={<Briefcase className="h-6 w-6" />}
           action={
-            <Link to="/app/work/new">
-              <Button>Add Work</Button>
-            </Link>
+            isWorker ? (
+              <Link to="/app/work/new">
+                <Button>Add Work</Button>
+              </Link>
+            ) : undefined
           }
         />
       ) : (

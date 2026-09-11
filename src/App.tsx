@@ -110,6 +110,15 @@ function RequireStaffJoin({ children }: { children: ReactNode }) {
   return children
 }
 
+/** Add Work is staff-only — owners view sales on Transactions. */
+function RequireStaff({ children }: { children: ReactNode }) {
+  const { session } = useAuth()
+  if (session?.role !== 'worker') {
+    return <Navigate to="/app/transactions" replace />
+  }
+  return children
+}
+
 function AppRoutes() {
   return (
     <Routes>
@@ -168,9 +177,11 @@ function AppRoutes() {
         element={
           <RequireAuth>
             <RequireOnboarded>
-              <AppShell>
-                <AddWorkPage />
-              </AppShell>
+              <RequireStaff>
+                <AppShell>
+                  <AddWorkPage />
+                </AppShell>
+              </RequireStaff>
             </RequireOnboarded>
           </RequireAuth>
         }
