@@ -53,7 +53,7 @@ export function AddWorkPage() {
       return
     }
 
-    const record = addWorkRecord({
+    addWorkRecord({
       shopId: shop.id,
       workerId,
       customerName: customerName.trim(),
@@ -70,13 +70,12 @@ export function AddWorkPage() {
       paymentMethod,
       notes: notes.trim() || undefined,
       createdAt: new Date().toISOString(),
-      synced: online,
     })
 
-    if (!record.synced) {
-      toast('Saved offline — waiting for sync', 'info')
+    if (!online) {
+      toast('Saved offline — will sync for the shop owner', 'info')
     } else {
-      toast('Work saved')
+      toast('Work saved · visible to shop owner')
     }
     setSavedAmount(totalAmount)
     setSaved(true)

@@ -52,4 +52,45 @@ export default defineSchema({
   })
     .index('by_code', ['code'])
     .index('by_claimed_email', ['claimedByEmail']),
+
+  /** Sales / jobs logged by staff — visible to the shop owner. */
+  workRecords: defineTable({
+    clientId: v.string(),
+    shopId: v.string(),
+    workerId: v.string(),
+    workerName: v.optional(v.string()),
+    customerName: v.string(),
+    customerPhone: v.optional(v.string()),
+    serviceId: v.optional(v.string()),
+    serviceName: v.string(),
+    category: v.string(),
+    quantity: v.number(),
+    totalAmount: v.number(),
+    amountPaid: v.number(),
+    amountPending: v.number(),
+    discount: v.number(),
+    tax: v.number(),
+    tip: v.number(),
+    paymentStatus: v.union(
+      v.literal('paid'),
+      v.literal('pending'),
+      v.literal('partial'),
+      v.literal('refunded'),
+    ),
+    paymentMethod: v.optional(
+      v.union(
+        v.literal('upi'),
+        v.literal('cash'),
+        v.literal('card'),
+        v.literal('bank'),
+        v.literal('other'),
+      ),
+    ),
+    notes: v.optional(v.string()),
+    createdAt: v.string(),
+    createdAtMs: v.number(),
+    updatedAt: v.number(),
+  })
+    .index('by_shop', ['shopId'])
+    .index('by_client_id', ['clientId']),
 })

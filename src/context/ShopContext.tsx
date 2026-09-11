@@ -11,6 +11,11 @@ import { createDemoStore, createEmptyStore } from '@/data/demo'
 import { computePaymentStatus } from '@/lib/permissions'
 import { uid } from '@/lib/format'
 import { loadJSON, saveJSON } from '@/lib/storage'
+import {
+  fetchWorkRecordsForShop,
+  mergeWorkRecords,
+  pushWorkRecordToCloud,
+} from '@/lib/workSync'
 import type {
   AppNotification,
   Customer,
@@ -235,7 +240,8 @@ export function ShopProvider({ children }: { children: ReactNode }) {
         id: uid('wr'),
         amountPending,
         paymentStatus,
-        synced: input.synced ?? online,
+        // Optimistic local save; cloud push marks synced
+        synced: false,
       }
       patchStore((prev) => {
         let customers = prev.customers
@@ -279,9 +285,23 @@ export function ShopProvider({ children }: { children: ReactNode }) {
           customers,
         }
       })
+
+      const workerName = store.workers.find((w) => w.id === record.workerId)?.name
+      void (async () => {
+        if (!online) return
+        const ok = await pushWorkRecordToCloud(record, workerName)
+        if (!ok) return
+        patchStore((prev) => ({
+          ...prev,
+          workRecords: prev.workRecords.map((w) =>
+            w.id === record.id ? { ...w, synced: true } : w,
+          ),
+        }))
+      })()
+
       return record
     },
-    [online, patchStore],
+    [online, patchStore, store.workers],
   )
 
   const updateWorkRecord = useCallback((id: string, patch: Partial<WorkRecord>) => {
@@ -387,21 +407,58 @@ export function ShopProvider({ children }: { children: ReactNode }) {
   )
 
   const syncOfflineQueue = useCallback(async () => {
-    if (!online || pendingSyncCount === 0) return
+    if (!online) return
+    const pending = store.workRecords.filter((w) => !w.synced)
+    if (pending.length === 0) return
     setSyncing(true)
-    await new Promise((r) => setTimeout(r, 800))
-    patchStore((prev) => ({
-      ...prev,
-      workRecords: prev.workRecords.map((w) => ({ ...w, synced: true })),
-    }))
-    setSyncing(false)
-  }, [online, pendingSyncCount, patchStore])
+    try {
+      for (const record of pending) {
+        const workerName = store.workers.find((w) => w.id === record.workerId)?.name
+        const ok = await pushWorkRecordToCloud(record, workerName)
+        if (ok) {
+          patchStore((prev) => ({
+            ...prev,
+            workRecords: prev.workRecords.map((w) =>
+              w.id === record.id ? { ...w, synced: true } : w,
+            ),
+          }))
+        }
+      }
+    } finally {
+      setSyncing(false)
+    }
+  }, [online, patchStore, store.workRecords, store.workers])
 
   useEffect(() => {
     if (online && pendingSyncCount > 0) {
       void syncOfflineQueue()
     }
   }, [online, pendingSyncCount, syncOfflineQueue])
+
+  /** Pull cloud sales for the active shop so owners see staff work. */
+  useEffect(() => {
+    if (!activeShopId || !online) return
+    let cancelled = false
+
+    const pull = async () => {
+      const cloud = await fetchWorkRecordsForShop(activeShopId)
+      if (cancelled) return
+      patchStore((prev) => ({
+        ...prev,
+        workRecords: mergeWorkRecords(prev.workRecords, cloud, activeShopId),
+      }))
+    }
+
+    void pull()
+    const id = window.setInterval(() => void pull(), 15_000)
+    const onFocus = () => void pull()
+    window.addEventListener('focus', onFocus)
+    return () => {
+      cancelled = true
+      window.clearInterval(id)
+      window.removeEventListener('focus', onFocus)
+    }
+  }, [activeShopId, online, patchStore])
 
   const value: ShopContextValue = {
     store,
