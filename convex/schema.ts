@@ -49,5 +49,7 @@ export default defineSchema({
     localWorkerId: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
-  }).index('by_code', ['code']),
+  })
+    .index('by_code', ['code'])
+    .index('by_claimed_email', ['claimedByEmail']),
 })

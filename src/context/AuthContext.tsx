@@ -21,6 +21,11 @@ import {
   fetchCloudMembership,
   isReturningMember,
 } from '@/lib/restoreSession'
+import {
+  buildStaffSession,
+  fetchClaimedStaffInvite,
+  hydrateStaffMembership,
+} from '@/lib/staffLogin'
 import { loadJSON, removeKey, saveJSON } from '@/lib/storage'
 import { uid } from '@/lib/format'
 import { createDemoStore } from '@/data/demo'
@@ -115,6 +120,36 @@ function initials(name: string) {
     .toUpperCase()
 }
 
+async function restoreStaffSession(input: {
+  id: string
+  name: string
+  email: string
+  picture?: string | null
+  phone?: string
+}): Promise<AuthSession | null> {
+  const claim = await fetchClaimedStaffInvite(input.email)
+  if (!claim) return null
+  const hydrated = hydrateStaffMembership({
+    claim,
+    staff: {
+      id: input.id,
+      name: input.name,
+      email: input.email,
+      phone: input.phone,
+    },
+  })
+  return buildStaffSession({
+    profile: {
+      id: input.id,
+      name: input.name,
+      email: input.email,
+      picture: input.picture,
+    },
+    shopId: hydrated.shopId,
+    workerId: hydrated.workerId,
+  })
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<AuthSession | null>(null)
   const [loading, setLoading] = useState(true)
@@ -136,26 +171,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       let next = saved
       const needsRestore = !saved.onboarded || !saved.activeShopId || saved.shopIds.length === 0
-      if (needsRestore && saved.user.email) {
-        const { user, shop } = await fetchCloudMembership(saved.user.email)
-        if (isReturningMember({ cloudUser: user, cloudShop: shop })) {
-          next = buildReturningSession({
-            profile: {
-              id: saved.user.id,
-              name: saved.user.name || user?.name || 'User',
-              email: saved.user.email,
-              picture: saved.user.picture ?? user?.picture,
+      if (saved.user.email) {
+        const staffSession = await restoreStaffSession({
+          id: saved.user.id,
+          name: saved.user.name,
+          email: saved.user.email,
+          picture: saved.user.picture,
+          phone: saved.user.phone,
+        })
+        if (staffSession) {
+          next = {
+            ...staffSession,
+            user: {
+              ...staffSession.user,
+              provider: saved.user.provider === 'email' ? 'email' : 'google',
             },
-            provider: saved.user.provider === 'email' ? 'email' : 'google',
-            local: {
-              userId: saved.user.id,
-              role: saved.role,
-              shopIds: saved.shopIds,
-              workerId: saved.workerId,
-            },
-            cloudUser: user,
-            cloudShop: shop,
-          })
+          }
           saveJSON('session', next)
           syncAccountFromSession({
             userId: next.user.id,
@@ -167,27 +198,59 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             workerId: next.workerId,
             onboarded: next.onboarded,
           })
-        }
-      } else if (saved.onboarded && saved.user.email) {
-        const { shop } = await fetchCloudMembership(saved.user.email)
-        if (shop) {
-          buildReturningSession({
-            profile: {
-              id: saved.user.id,
-              name: saved.user.name,
-              email: saved.user.email,
-              picture: saved.user.picture,
-            },
-            provider: saved.user.provider === 'email' ? 'email' : 'google',
-            local: {
-              userId: saved.user.id,
-              role: saved.role,
-              shopIds: saved.shopIds,
-              workerId: saved.workerId,
-            },
-            cloudUser: null,
-            cloudShop: shop,
-          })
+        } else if (needsRestore) {
+          const { user, shop } = await fetchCloudMembership(saved.user.email)
+          if (isReturningMember({ cloudUser: user, cloudShop: shop })) {
+            next = buildReturningSession({
+              profile: {
+                id: saved.user.id,
+                name: saved.user.name || user?.name || 'User',
+                email: saved.user.email,
+                picture: saved.user.picture ?? user?.picture,
+              },
+              provider: saved.user.provider === 'email' ? 'email' : 'google',
+              local: {
+                userId: saved.user.id,
+                role: saved.role,
+                shopIds: saved.shopIds,
+                workerId: saved.workerId,
+              },
+              cloudUser: user,
+              cloudShop: shop,
+            })
+            saveJSON('session', next)
+            syncAccountFromSession({
+              userId: next.user.id,
+              email: next.user.email,
+              name: next.user.name,
+              picture: next.user.picture ?? null,
+              role: next.role,
+              shopIds: next.shopIds,
+              workerId: next.workerId,
+              onboarded: next.onboarded,
+            })
+          }
+        } else if (saved.onboarded) {
+          const { shop } = await fetchCloudMembership(saved.user.email)
+          if (shop) {
+            buildReturningSession({
+              profile: {
+                id: saved.user.id,
+                name: saved.user.name,
+                email: saved.user.email,
+                picture: saved.user.picture,
+              },
+              provider: saved.user.provider === 'email' ? 'email' : 'google',
+              local: {
+                userId: saved.user.id,
+                role: saved.role,
+                shopIds: saved.shopIds,
+                workerId: saved.workerId,
+              },
+              cloudUser: null,
+              cloudShop: shop,
+            })
+          }
         }
       }
 
@@ -229,6 +292,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const profile = await signInWithGooglePopup()
         const existing = getAccountByEmail(profile.email)
+
+        // Returning staff who already claimed an invite code
+        const staffSession = await restoreStaffSession({
+          id: profile.id,
+          name: profile.name,
+          email: profile.email,
+          picture: profile.picture,
+        })
+        if (staffSession) {
+          if (convexReady && convex) {
+            try {
+              await convex.mutation(api.users.upsertByEmail, {
+                email: profile.email,
+                name: profile.name,
+                picture: profile.picture,
+                googleId: profile.id,
+                role: 'worker',
+              })
+            } catch {
+              // Local auth still works if Convex is briefly unreachable
+            }
+          }
+          persist(staffSession)
+          return staffSession
+        }
+
         const { user: cloudUser, shop: cloudShop } = await fetchCloudMembership(profile.email)
 
         const returning = isReturningMember({
@@ -239,7 +328,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         })
 
         // Existing shop owners always skip onboarding — even if UI said "signup"
-        if (returning) {
+        if (returning && (cloudShop || existing?.role === 'owner' || cloudUser?.role === 'owner')) {
           const next = buildReturningSession({
             profile,
             provider: 'google',
@@ -368,6 +457,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       const existing = getAccountByEmail(email)
+      const staffSession = await restoreStaffSession({
+        id: existing?.userId || uid('u'),
+        name: existing?.name || email.split('@')[0],
+        email,
+        picture: existing?.picture,
+      })
+      if (staffSession) {
+        persist({
+          ...staffSession,
+          user: { ...staffSession.user, provider: 'email' },
+        })
+        setBusy(false)
+        return
+      }
+
       const { user: cloudUser, shop: cloudShop } = await fetchCloudMembership(email)
 
       if (
@@ -376,7 +480,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           localShopIds: existing?.shopIds,
           cloudUser,
           cloudShop,
-        })
+        }) &&
+        (cloudShop || existing?.role === 'owner' || cloudUser?.role === 'owner')
       ) {
         persist(
           buildReturningSession({

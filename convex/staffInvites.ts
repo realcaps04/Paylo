@@ -149,6 +149,52 @@ export const listByOwnerEmail = query({
   },
 })
 
+export const getClaimedByEmail = query({
+  args: { staffEmail: v.string() },
+  handler: async (ctx, args) => {
+    const staffEmail = normalizeEmail(args.staffEmail)
+    const invite = await ctx.db
+      .query('staffInvites')
+      .withIndex('by_claimed_email', (q) => q.eq('claimedByEmail', staffEmail))
+      .first()
+    if (!invite || !invite.claimed) return null
+
+    const shop = await ctx.db
+      .query('shops')
+      .withIndex('by_owner_email', (q) => q.eq('ownerEmail', invite.ownerEmail))
+      .first()
+
+    return {
+      code: invite.code,
+      shopId: invite.shopId,
+      shopName: invite.shopName,
+      ownerEmail: invite.ownerEmail,
+      workerName: invite.workerName,
+      workerPhone: invite.workerPhone,
+      workerEmail: invite.workerEmail,
+      role: invite.role,
+      localWorkerId: invite.localWorkerId,
+      shop: shop
+        ? {
+            _id: shop._id,
+            ownerEmail: shop.ownerEmail,
+            shopName: shop.shopName,
+            businessType: shop.businessType,
+            logoUrl: shop.logoUrl,
+            address: shop.address,
+            city: shop.city,
+            state: shop.state,
+            pinCode: shop.pinCode,
+            contactNumber: shop.contactNumber,
+            categoryId: shop.categoryId,
+            categoryName: shop.categoryName,
+            createdAt: shop.createdAt,
+          }
+        : null,
+    }
+  },
+})
+
 export const claim = mutation({
   args: {
     code: v.string(),
@@ -165,15 +211,40 @@ export const claim = mutation({
 
     const staffEmail = normalizeEmail(args.staffEmail)
     if (invite.claimed && invite.claimedByEmail !== staffEmail) {
-      throw new Error('This invite code was already used')
+      throw new Error('This invite code was already used by another staff member')
     }
 
+    const now = Date.now()
     if (!invite.claimed) {
       await ctx.db.patch(invite._id, {
         claimed: true,
         claimedByEmail: staffEmail,
         workerName: args.staffName?.trim() || invite.workerName,
-        updatedAt: Date.now(),
+        updatedAt: now,
+      })
+    }
+
+    // Mark staff user as onboarded worker in users table
+    const user = await ctx.db
+      .query('users')
+      .withIndex('by_email', (q) => q.eq('email', staffEmail))
+      .unique()
+    if (user) {
+      await ctx.db.patch(user._id, {
+        role: 'worker',
+        onboarded: true,
+        name: args.staffName?.trim() || user.name,
+        updatedAt: now,
+      })
+    } else {
+      await ctx.db.insert('users', {
+        email: staffEmail,
+        name: args.staffName?.trim() || invite.workerName,
+        picture: null,
+        role: 'worker',
+        onboarded: true,
+        createdAt: now,
+        updatedAt: now,
       })
     }
 
@@ -190,7 +261,7 @@ export const claim = mutation({
       workerName: args.staffName?.trim() || invite.workerName,
       workerPhone: invite.workerPhone,
       workerEmail: invite.workerEmail,
-      role: invite.role,
+      role: 'worker' as const,
       localWorkerId: invite.localWorkerId,
       shop: shop
         ? {

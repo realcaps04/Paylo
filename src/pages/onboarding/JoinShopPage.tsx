@@ -8,10 +8,8 @@ import { useShop } from '@/context/ShopContext'
 import { useToast } from '@/context/ToastContext'
 import { cn } from '@/lib/cn'
 import { normalizeInviteCode } from '@/lib/inviteCode'
-import { convexHttp, convexReady } from '@/lib/convex'
-import { api } from '../../../convex/_generated/api'
-import { mergeCloudShopIntoStore } from '@/lib/restoreSession'
-import { uid } from '@/lib/format'
+import { convexReady } from '@/lib/convex'
+import { claimStaffInviteCode, hydrateStaffMembership } from '@/lib/staffLogin'
 
 function ProgressDots({ active }: { active: number }) {
   return (
@@ -31,12 +29,18 @@ function ProgressDots({ active }: { active: number }) {
 
 export function JoinShopPage() {
   const navigate = useNavigate()
-  const { session, attachShop, clearRoleChoice } = useAuth()
-  const { store, addWorker, addShop, updateWorker } = useShop()
+  const { session, attachShop, clearRoleChoice, logout } = useAuth()
+  const { store, updateWorker } = useShop()
   const { toast } = useToast()
   const [code, setCode] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const finishAsStaff = (shopId: string, workerId: string, shopName: string) => {
+    attachShop(shopId, 'worker', workerId)
+    toast(`Logged in as staff · ${shopName}`)
+    navigate('/app/work/new')
+  }
 
   const join = async () => {
     setError(null)
@@ -45,12 +49,34 @@ export function JoinShopPage() {
       setError('Enter the 8-character invite code from your shop owner.')
       return
     }
+    if (!session?.user.email) {
+      setError('Sign in with Google first, then enter your staff code.')
+      return
+    }
 
     setBusy(true)
-    await new Promise((r) => setTimeout(r, 150))
-
     try {
-      // 1) Same-device / local store first
+      // Prefer cloud claim so staff can join from any device
+      if (convexReady) {
+        const claimed = await claimStaffInviteCode({
+          code: trimmed,
+          staffEmail: session.user.email,
+          staffName: session.user.name,
+        })
+        const hydrated = hydrateStaffMembership({
+          claim: claimed,
+          staff: {
+            id: session.user.id,
+            name: session.user.name,
+            email: session.user.email,
+            phone: session.user.phone,
+          },
+        })
+        finishAsStaff(hydrated.shopId, hydrated.workerId, hydrated.shopName)
+        return
+      }
+
+      // Offline / same-device fallback
       const localInvite = store.workers.find(
         (w) =>
           w.inviteCode &&
@@ -58,105 +84,25 @@ export function JoinShopPage() {
           w.role !== 'owner' &&
           w.active,
       )
-
-      if (localInvite) {
-        const shop = store.shops.find((s) => s.id === localInvite.shopId)
-        if (!shop) {
-          setError('This invite is no longer linked to a shop.')
-          setBusy(false)
-          return
-        }
-        updateWorker(localInvite.id, {
-          userId: session?.user.id,
-          name: session?.user.name || localInvite.name,
-          email: session?.user.email || localInvite.email,
-          phone: session?.user.phone || localInvite.phone,
-          inviteStatus: 'joined',
-        })
-        attachShop(
-          shop.id,
-          localInvite.role === 'manager' ? 'manager' : 'worker',
-          localInvite.id,
-        )
-        toast(`Joined ${shop.name}`)
-        setBusy(false)
-        navigate('/app')
+      if (!localInvite) {
+        setError('No staff invite found for that code. Ask your owner for a new code.')
+        return
+      }
+      const shop = store.shops.find((s) => s.id === localInvite.shopId)
+      if (!shop) {
+        setError('This invite is no longer linked to a shop.')
         return
       }
 
-      // 2) Cloud invite (other devices)
-      if (convexReady && convexHttp && session?.user.email) {
-        const claimed = await convexHttp.mutation(api.staffInvites.claim, {
-          code: trimmed,
-          staffEmail: session.user.email,
-          staffName: session.user.name,
-        })
+      updateWorker(localInvite.id, {
+        userId: session.user.id,
+        name: session.user.name || localInvite.name,
+        email: session.user.email,
+        inviteStatus: 'joined',
+        role: 'worker',
+      })
 
-        const shopId = claimed.shop ? String(claimed.shop._id) : claimed.shopId
-        const shopName = claimed.shop?.shopName ?? claimed.shopName
-
-        if (claimed.shop) {
-          mergeCloudShopIntoStore(claimed.shop as Parameters<typeof mergeCloudShopIntoStore>[0], {
-            id: session.user.id,
-            name: claimed.shop.shopName,
-            email: claimed.ownerEmail,
-          })
-        } else if (!store.shops.some((s) => s.id === shopId)) {
-          addShop({
-            id: shopId,
-            name: shopName,
-            categoryId: 'general',
-            categoryName: 'Shop',
-            ownerName: 'Owner',
-            phone: '',
-            email: claimed.ownerEmail,
-            address: '',
-            city: '',
-            state: '',
-            pinCode: '',
-            description: shopName,
-            hours: { open: '09:00', close: '20:00', holidays: [] },
-            createdAt: new Date().toISOString(),
-          })
-        }
-
-        const existing = store.workers.find(
-          (w) => w.inviteCode && normalizeInviteCode(w.inviteCode) === trimmed,
-        )
-        const workerId =
-          existing?.id ??
-          addWorker({
-            id: claimed.localWorkerId || uid('w'),
-            shopId,
-            userId: session.user.id,
-            name: session.user.name || claimed.workerName,
-            role: claimed.role,
-            phone: session.user.phone || claimed.workerPhone || '',
-            email: session.user.email || claimed.workerEmail || '',
-            employeeId: `EMP-${Math.floor(1000 + Math.random() * 9000)}`,
-            joiningDate: new Date().toISOString().slice(0, 10),
-            active: true,
-            inviteStatus: 'joined',
-            inviteCode: trimmed,
-          }).id
-
-        if (existing) {
-          updateWorker(existing.id, {
-            userId: session.user.id,
-            inviteStatus: 'joined',
-            name: session.user.name || existing.name,
-            email: session.user.email || existing.email,
-          })
-        }
-
-        attachShop(shopId, claimed.role, workerId)
-        toast(`Joined ${shopName}`)
-        setBusy(false)
-        navigate('/app')
-        return
-      }
-
-      setError('No staff invite found for that code. Ask your owner for a new code.')
+      finishAsStaff(shop.id, localInvite.id, shop.name)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Could not join with that code'
       setError(message)
@@ -199,8 +145,9 @@ export function JoinShopPage() {
           <h1 className="mt-5 text-center font-display text-[26px] font-extrabold tracking-[-0.03em] text-[#0f1a33]">
             Staff Login
           </h1>
-          <p className="mx-auto mt-2 max-w-[300px] text-center text-[14px] leading-relaxed text-slate-500">
-            Enter the 8-character code your shop owner shared with you.
+          <p className="mx-auto mt-2 max-w-[320px] text-center text-[14px] leading-relaxed text-slate-500">
+            Enter the 8-character code for your staff profile. You&apos;ll join that shop and can
+            start recording sales.
           </p>
 
           <div className="mt-8 rounded-[22px] bg-white p-5 shadow-[0_14px_40px_rgba(18,50,110,0.10)] ring-1 ring-slate-100">
@@ -223,7 +170,7 @@ export function JoinShopPage() {
               loading={busy}
               onClick={() => void join()}
             >
-              Continue
+              Join shop & record sales
               <ArrowRight className="h-4 w-4" />
             </Button>
           </div>
@@ -237,6 +184,16 @@ export function JoinShopPage() {
             className="mt-6 w-full text-center text-[13px] font-medium text-slate-500 hover:text-[#0064f0]"
           >
             Not staff? Choose Shop Owner instead
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              logout()
+              navigate('/login')
+            }}
+            className="mt-3 w-full text-center text-[13px] font-medium text-slate-400 hover:text-[#0064f0]"
+          >
+            Sign out
           </button>
         </motion.div>
 
