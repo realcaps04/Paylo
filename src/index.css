@@ -1,0 +1,84 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  --brand: #0064f0;
+  --bg: #ffffff;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: 'DM Sans', system-ui, sans-serif;
+  background: var(--bg);
+  color: #0f172a;
+  overflow-x: hidden;
+}
+
+body.standalone {
+  padding-top: env(safe-area-inset-top);
+}
+
+#root {
+  min-height: 100dvh;
+}
+
+/* Force brand utilities even if older CSS was cached */
+.bg-brand-600,
+.hover\:bg-brand-600:hover {
+  background-color: #0064f0 !important;
+}
+.hover\:bg-brand-700:hover,
+.bg-brand-700 {
+  background-color: #0050c4 !important;
+}
+.text-brand-600,
+.text-brand-700 {
+  color: #0064f0 !important;
+}
+.text-brand-800 {
+  color: #0043a0 !important;
+}
+.bg-brand-50 {
+  background-color: #eef5ff !important;
+}
+.border-brand-500 {
+  border-color: #2f78ff !important;
+}
+
+@layer utilities {
+  .pb-safe {
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+  }
+  .pt-safe {
+    padding-top: env(safe-area-inset-top);
+  }
+  .mb-nav {
+    margin-bottom: calc(4.5rem + env(safe-area-inset-bottom));
+  }
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
