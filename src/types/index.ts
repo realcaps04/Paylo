@@ -146,6 +146,8 @@ export interface AuthSession {
   activeShopId: string | null
   workerId?: string
   onboarded: boolean
+  /** False until the user picks Shop Owner / Shop Staff after first sign-in */
+  roleChosen?: boolean
 }
 
 export type DateRangePreset =

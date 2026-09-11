@@ -33,6 +33,8 @@ interface AuthContextValue {
   setOnboarded: (value: boolean) => void
   setActiveShop: (shopId: string) => void
   attachShop: (shopId: string, role: Role, workerId?: string) => void
+  chooseRole: (role: Role) => void
+  clearRoleChoice: () => void
   clearError: () => void
 }
 
@@ -164,6 +166,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               activeShopId: existing.shopIds[0] ?? null,
               workerId: existing.workerId,
               onboarded: true,
+              roleChosen: true,
             }
           : {
               user: {
@@ -188,12 +191,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               onboarded: forceSignup
                 ? false
                 : Boolean(existing?.onboarded && (existing.shopIds?.length ?? 0) > 0),
+              roleChosen: false,
             }
 
-        // Fresh Google users with no shop start onboarding
+        // Fresh Google users with no shop start role selection + onboarding
         if (!next.shopIds.length) {
           next.onboarded = false
           next.activeShopId = null
+          next.roleChosen = false
         }
 
         persist(next)
@@ -232,6 +237,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         activeShopId: pick.shopIds[0] ?? null,
         workerId: pick.workerId,
         onboarded: pick.onboarded,
+        roleChosen: pick.onboarded,
       })
       setBusy(false)
     },
@@ -306,6 +312,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [persist, session],
   )
 
+  const chooseRole = useCallback(
+    (role: Role) => {
+      if (!session) return
+      persist({
+        ...session,
+        role,
+        roleChosen: true,
+        onboarded: false,
+        activeShopId: null,
+        shopIds: role === 'owner' ? session.shopIds : [],
+      })
+    },
+    [persist, session],
+  )
+
+  const clearRoleChoice = useCallback(() => {
+    if (!session) return
+    persist({
+      ...session,
+      roleChosen: false,
+      onboarded: false,
+      activeShopId: null,
+    })
+  }, [persist, session])
+
   const attachShop = useCallback(
     (shopId: string, role: Role, workerId?: string) => {
       if (!session) return
@@ -319,6 +350,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         activeShopId: shopId,
         workerId: workerId ?? session.workerId,
         onboarded: true,
+        roleChosen: true,
       })
     },
     [persist, session],
@@ -338,6 +370,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setOnboarded,
       setActiveShop,
       attachShop,
+      chooseRole,
+      clearRoleChoice,
       clearError: () => setError(null),
     }),
     [
@@ -353,6 +387,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setOnboarded,
       setActiveShop,
       attachShop,
+      chooseRole,
+      clearRoleChoice,
     ],
   )
 

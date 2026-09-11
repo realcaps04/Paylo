@@ -83,13 +83,13 @@ function ShopScene({ className }: { className?: string }) {
       </defs>
 
       {/* Payments card behind the shop */}
-      <g transform="rotate(-7 256 68)">
-        <rect x="192" y="8" width="126" height="118" rx="15" fill="#ffffff" />
+      <g transform="rotate(-7 256 72)">
+        <rect x="192" y="16" width="126" height="112" rx="15" fill="#ffffff" />
         <rect
           x="192"
-          y="8"
+          y="16"
           width="126"
-          height="118"
+          height="112"
           rx="15"
           fill="none"
           stroke="#dce8fd"
@@ -97,7 +97,7 @@ function ShopScene({ className }: { className?: string }) {
         />
         <text
           x="208"
-          y="34"
+          y="42"
           fill="#7c8ba5"
           fontSize="12"
           fontWeight="600"
@@ -105,19 +105,26 @@ function ShopScene({ className }: { className?: string }) {
         >
           Payments
         </text>
-        <rect x="209" y="86" width="13" height="22" rx="4" fill="url(#ps-bar)" opacity="0.55" />
-        <rect x="229" y="74" width="13" height="34" rx="4" fill="url(#ps-bar)" opacity="0.75" />
-        <rect x="249" y="60" width="13" height="48" rx="4" fill="url(#ps-bar)" opacity="0.9" />
-        <rect x="269" y="46" width="13" height="62" rx="4" fill="url(#ps-bar)" />
+        <rect x="240" y="86" width="14" height="22" rx="4" fill="url(#ps-bar)" opacity="0.5" />
+        <rect x="258" y="74" width="14" height="34" rx="4" fill="url(#ps-bar)" opacity="0.7" />
+        <rect x="276" y="62" width="14" height="46" rx="4" fill="url(#ps-bar)" opacity="0.88" />
+        <rect x="294" y="48" width="14" height="60" rx="4" fill="url(#ps-bar)" />
         <path
-          d="M208 94 C 234 90 248 68 288 46"
+          d="M236 100 C 262 96 276 74 302 48"
+          fill="none"
+          stroke="#ffffff"
+          strokeWidth="7"
+          strokeLinecap="round"
+        />
+        <path
+          d="M236 100 C 262 96 276 74 302 48"
           fill="none"
           stroke="#0064f0"
           strokeWidth="3"
           strokeLinecap="round"
         />
         <path
-          d="M275 44 L 291 43 L 288 58"
+          d="M289 46 L 305 45 L 302 60"
           fill="none"
           stroke="#0064f0"
           strokeWidth="3"
@@ -133,7 +140,7 @@ function ShopScene({ className }: { className?: string }) {
 
       {/* Shop body */}
       <rect x="96" y="102" width="150" height="96" rx="5" fill="url(#ps-body)" />
-      <rect x="228" y="102" width="18" height="96" fill="#e6eefc" opacity="0.75" />
+      <rect x="232" y="102" width="14" height="96" fill="#e6eefc" opacity="0.55" />
 
       {/* Roof slab */}
       <rect x="84" y="62" width="176" height="15" rx="7.5" fill="url(#ps-roof)" />
@@ -224,7 +231,7 @@ export function LoginPage() {
   }
 
   return (
-    <div className="relative flex min-h-dvh flex-col overflow-hidden bg-[#fcfdff]">
+    <div className="relative flex min-h-dvh flex-col overflow-x-hidden bg-[#fcfdff]">
       {/* Soft brand background */}
       <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -left-28 -top-24 h-80 w-80 rounded-full bg-[#e4efff] blur-[64px]" />
@@ -234,7 +241,7 @@ export function LoginPage() {
         <div className="absolute bottom-16 -left-20 h-44 w-44 rounded-full bg-[#eff5ff] blur-[50px]" />
       </div>
 
-      <div className="relative z-10 mx-auto flex w-full max-w-[440px] flex-1 flex-col px-6 pb-safe pb-5 pt-safe pt-4">
+      <div className="relative z-10 mx-auto flex w-full max-w-[440px] flex-1 flex-col px-6 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] pt-[calc(env(safe-area-inset-top)+1rem)]">
         {/* Need help */}
         <div className="flex justify-end">
           <a
@@ -254,14 +261,14 @@ export function LoginPage() {
           className="mt-3 flex flex-col items-center"
         >
           <LogoMark size="2xl" className="drop-shadow-[0_18px_36px_rgba(0,86,214,0.22)]" />
-          <div className="mt-4 flex items-end justify-center">
+          <div className="mt-4 flex items-baseline justify-center">
             <img
               src="/paylo-p-glyph.png"
               alt=""
               aria-hidden
-              className="h-[48px] w-auto translate-y-[8px] select-none"
+              className="h-[52px] w-auto translate-y-[10px] select-none"
             />
-            <span className="font-display text-[46px] font-extrabold leading-[0.9] tracking-[-0.03em] text-[#0f1a33]">
+            <span className="font-display text-[46px] font-extrabold leading-none tracking-[-0.03em] text-[#0f1a33]">
               aylo
             </span>
           </div>
@@ -277,7 +284,7 @@ export function LoginPage() {
           transition={{ delay: 0.1, duration: 0.45, ease: 'easeOut' }}
           className="mt-8 flex items-center gap-1"
         >
-          <div className="w-[52%] shrink-0">
+          <div className="w-[53%] shrink-0">
             <h1 className="font-display text-[28px] font-extrabold leading-[1.14] tracking-[-0.025em] text-[#0f1a33]">
               Smarter Payments for{' '}
               <span className="text-[#0064f0]">Growing Shops</span>
@@ -289,7 +296,7 @@ export function LoginPage() {
           <motion.div
             animate={{ y: [0, -6, 0] }}
             transition={{ duration: 5.5, repeat: Infinity, ease: 'easeInOut' }}
-            className="-mr-5 w-[52%] min-w-0"
+            className="-mr-6 w-[47%] min-w-0"
           >
             <ShopScene className="h-auto w-full" />
           </motion.div>
@@ -344,19 +351,17 @@ export function LoginPage() {
             onClick={() => void handleGoogle()}
             disabled={!googleReady || authBusy}
             className={cn(
-              'relative flex h-[68px] w-full items-center justify-center rounded-full bg-white ring-1 ring-slate-100/90',
-              'shadow-[0_16px_40px_rgba(18,50,110,0.13)] transition',
+              'grid h-[68px] w-full grid-cols-[30px_1fr_30px] items-center gap-3 rounded-full bg-white px-[22px]',
+              'ring-1 ring-slate-100/90 shadow-[0_16px_40px_rgba(18,50,110,0.13)] transition',
               'hover:shadow-[0_18px_46px_rgba(18,50,110,0.2)] active:scale-[0.99]',
               'disabled:cursor-not-allowed disabled:opacity-60',
             )}
           >
-            <span className="absolute left-[22px] flex items-center">
-              <GoogleGlyph className="h-[30px] w-[30px]" />
-            </span>
-            <span className="font-display text-[17.5px] font-bold tracking-[-0.01em] text-[#0f1a33]">
+            <GoogleGlyph className="h-[30px] w-[30px]" />
+            <span className="whitespace-nowrap text-center font-display text-[16.5px] font-bold tracking-[-0.01em] text-[#0f1a33]">
               {authBusy ? 'Signing you in…' : 'Continue with Google'}
             </span>
-            <span className="absolute right-[26px] flex items-center text-[#0f1a33]">
+            <span className="flex items-center justify-end text-[#0f1a33]">
               {authBusy ? (
                 <Loader2 className="h-5 w-5 animate-spin" strokeWidth={2.4} />
               ) : (
