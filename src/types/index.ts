@@ -109,6 +109,8 @@ export interface WorkRecord {
   paymentStatus: PaymentStatus
   paymentMethod?: PaymentMethod
   notes?: string
+  editReason?: string
+  editHistory?: { reason: string; editedAt: string; editedBy?: string }[]
   createdAt: string
   synced: boolean
   offlineId?: string

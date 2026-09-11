@@ -7,17 +7,16 @@ import {
   Plus,
   UserPlus,
   Users,
-  Wallet,
-  ClipboardList,
 } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { useAuth } from '@/context/AuthContext'
 import { useShop } from '@/context/ShopContext'
 import { Card, PageHeader } from '@/components/ui'
-import { formatINR, formatDate, greeting } from '@/lib/format'
+import { formatINR, greeting } from '@/lib/format'
 import { filterByDateRange, sumField } from '@/lib/permissions'
 import { cn } from '@/lib/cn'
 import type { PaymentMethod } from '@/types'
+import { StaffHomePage } from '@/pages/StaffHomePage'
 
 function pctChange(current: number, previous: number) {
   if (previous <= 0) return current > 0 ? 100 : 0
@@ -54,6 +53,17 @@ function OwnerDashboard() {
   const salesDelta = pctChange(todaySales, yesterdaySales)
 
   const totalCustomers = customers.length
+  // Unique people from sales (phone when available, otherwise name)
+  const customersFromSales = useMemo(() => {
+    const keys = new Set<string>()
+    for (const r of workRecords) {
+      if (!r.customerName.trim()) continue
+      const phone = (r.customerPhone ?? '').replace(/\D/g, '')
+      keys.add(phone.length >= 8 ? `p:${phone}` : `n:${r.customerName.trim().toLowerCase()}`)
+    }
+    return keys.size
+  }, [workRecords])
+  const displayCustomerCount = Math.max(totalCustomers, customersFromSales)
   const shopStaff = workers.filter((w) => {
     if (!w.active || w.role === 'owner') return false
     // Owner account must never count as staff
@@ -132,7 +142,7 @@ function OwnerDashboard() {
           <div>
             <p className="text-[13px] font-medium text-slate-500">Total Customers</p>
             <p className="mt-1 font-display text-2xl font-bold tracking-tight text-[#0f1a33]">
-              {totalCustomers}
+                      {displayCustomerCount}
             </p>
             <p className="mt-1 text-[11px] text-slate-400">{totalServices} services</p>
           </div>
@@ -250,90 +260,7 @@ function OwnerDashboard() {
 }
 
 function WorkerDashboard() {
-  const { session } = useAuth()
-  const { workRecords, shop } = useShop()
-  const workerId = session?.workerId
-
-  const mine = useMemo(
-    () => workRecords.filter((r) => r.workerId === workerId),
-    [workRecords, workerId],
-  )
-  const today = useMemo(() => filterByDateRange(mine, 'today'), [mine])
-  const earnings = sumField(today, 'amountPaid')
-
-  return (
-    <div className="space-y-6">
-      <PageHeader
-        title={`${greeting()}, ${session?.user.name?.split(' ')[0] ?? 'there'}`}
-        subtitle={shop?.name ?? 'Your work today'}
-      />
-
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Card className="rounded-[22px] border-0 bg-gradient-to-br from-[#1a7bff] to-[#0064f0] p-4 text-white shadow-lg shadow-[#0064f0]/25">
-          <p className="text-sm text-white/80">Today&apos;s Earnings</p>
-          <p className="mt-1 font-display text-2xl font-bold">{formatINR(earnings)}</p>
-          <p className="mt-2 text-xs text-white/70">{today.length} jobs today</p>
-        </Card>
-        <Card className="rounded-[22px] p-4">
-          <p className="text-sm text-slate-500">All-time jobs</p>
-          <p className="mt-1 font-display text-2xl font-bold text-[#0f1a33]">{mine.length}</p>
-        </Card>
-      </div>
-
-      <Link
-        to="/app/work/new"
-        className="flex items-center justify-center gap-3 rounded-[22px] bg-[#0064f0] px-6 py-7 text-white shadow-lg shadow-[#0064f0]/30 transition hover:bg-[#0050c4]"
-      >
-        <Plus className="h-7 w-7" strokeWidth={2.5} />
-        <span className="font-display text-2xl font-bold">Add Work</span>
-      </Link>
-
-      <Card className="rounded-[22px]">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="font-display text-lg font-semibold text-ink">Recent Work</h2>
-          <Link to="/app/work" className="text-sm font-semibold text-[#0064f0]">
-            See all
-          </Link>
-        </div>
-        <div className="space-y-2">
-          {mine.slice(0, 6).map((r) => (
-            <div
-              key={r.id}
-              className="flex items-center justify-between rounded-2xl border border-slate-200 px-3 py-3"
-            >
-              <div>
-                <p className="text-sm font-semibold text-ink">{r.customerName}</p>
-                <p className="text-xs text-ink-muted">{formatDate(r.createdAt)}</p>
-              </div>
-              <div className="text-right">
-                <p className="text-sm font-semibold">{formatINR(r.totalAmount)}</p>
-              </div>
-            </div>
-          ))}
-          {mine.length === 0 && (
-            <p className="py-8 text-center text-sm text-ink-muted">No work logged yet</p>
-          )}
-        </div>
-      </Card>
-
-      <div className="grid gap-2 sm:grid-cols-2">
-        <Link
-          to="/app/earnings"
-          className="flex items-center gap-2 rounded-2xl border border-slate-200 px-3 py-3 text-sm font-medium hover:bg-slate-50"
-        >
-          <Wallet className="h-4 w-4 text-[#0064f0]" />
-          View Earnings
-        </Link>
-        <Link
-          to="/app/work"
-          className="flex items-center gap-2 rounded-2xl border border-slate-200 px-3 py-3 text-sm font-medium hover:bg-slate-50"
-        >
-          <ClipboardList className="h-4 w-4 text-[#0064f0]" />
-          My Work Records
-        </Link>
-      </div>
-    </div>
-  )
+  return <StaffHomePage />
 }
 
 export function DashboardPage() {

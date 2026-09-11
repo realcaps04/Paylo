@@ -15,7 +15,10 @@ import {
   fetchWorkRecordsForShop,
   mergeWorkRecords,
   pushWorkRecordToCloud,
+  pushWorkUpdateToCloud,
+  deleteWorkFromCloud,
 } from '@/lib/workSync'
+import { rebuildShopCustomers } from '@/lib/customersFromWork'
 import type {
   AppNotification,
   Customer,
@@ -68,7 +71,11 @@ interface ShopContextValue {
       synced?: boolean
     },
   ) => WorkRecord
-  updateWorkRecord: (id: string, patch: Partial<WorkRecord>) => void
+  updateWorkRecord: (
+    id: string,
+    patch: Partial<WorkRecord>,
+    opts?: { editReason: string; editedBy?: string },
+  ) => void
   deleteWorkRecord: (id: string) => void
   recordPayment: (
     workRecordId: string,
@@ -104,7 +111,17 @@ function stripDemoData(store: ShopStore): ShopStore {
 function hydrateStore(): ShopStore {
   const saved = loadJSON<ShopStore | null>('store', null)
   if (!saved) return createEmptyStore()
-  return stripDemoData(saved)
+  const stripped = stripDemoData(saved)
+  const shopIds = new Set(stripped.workRecords.map((r) => r.shopId))
+  let customers = stripped.customers
+  for (const shopId of shopIds) {
+    customers = rebuildShopCustomers({
+      customers,
+      workRecords: stripped.workRecords,
+      shopId,
+    })
+  }
+  return { ...stripped, customers }
 }
 
 export function ShopProvider({ children }: { children: ReactNode }) {
@@ -265,45 +282,15 @@ export function ShopProvider({ children }: { children: ReactNode }) {
         synced: false,
       }
       patchStore((prev) => {
-        let customers = prev.customers
-        if (input.customerName) {
-          const existing = customers.find(
-            (c) =>
-              c.shopId === input.shopId &&
-              (c.phone === input.customerPhone || c.name === input.customerName),
-          )
-          if (existing) {
-            customers = customers.map((c) =>
-              c.id === existing.id
-                ? {
-                    ...c,
-                    totalVisits: c.totalVisits + 1,
-                    totalSpent: c.totalSpent + input.amountPaid,
-                    pendingAmount: c.pendingAmount + amountPending,
-                    lastVisit: input.createdAt,
-                  }
-                : c,
-            )
-          } else if (input.customerPhone || input.customerName) {
-            customers = [
-              ...customers,
-              {
-                id: uid('c'),
-                shopId: input.shopId,
-                name: input.customerName,
-                phone: input.customerPhone ?? '',
-                totalVisits: 1,
-                totalSpent: input.amountPaid,
-                pendingAmount: amountPending,
-                lastVisit: input.createdAt,
-              },
-            ]
-          }
-        }
+        const workRecords = [record, ...prev.workRecords]
         return {
           ...prev,
-          workRecords: [record, ...prev.workRecords],
-          customers,
+          workRecords,
+          customers: rebuildShopCustomers({
+            customers: prev.customers,
+            workRecords,
+            shopId: input.shopId,
+          }),
         }
       })
 
@@ -325,27 +312,93 @@ export function ShopProvider({ children }: { children: ReactNode }) {
     [online, patchStore, store.workers],
   )
 
-  const updateWorkRecord = useCallback((id: string, patch: Partial<WorkRecord>) => {
-    patchStore((prev) => ({
-      ...prev,
-      workRecords: prev.workRecords.map((w) => {
-        if (w.id !== id) return w
-        const next = { ...w, ...patch }
-        next.amountPending = Math.max(0, next.totalAmount - next.amountPaid)
-        next.paymentStatus =
+  const updateWorkRecord = useCallback(
+    (
+      id: string,
+      patch: Partial<WorkRecord>,
+      opts?: { editReason: string; editedBy?: string },
+    ) => {
+      const prevStore = loadJSON<ShopStore | null>('store', null)
+      const current = prevStore?.workRecords.find((w) => w.id === id)
+      if (!current) return
+
+      const next: WorkRecord = {
+        ...current,
+        ...patch,
+        amountPending: Math.max(
+          0,
+          (patch.totalAmount ?? current.totalAmount) -
+            (patch.amountPaid ?? current.amountPaid),
+        ),
+        paymentStatus:
           patch.paymentStatus ??
-          computePaymentStatus(next.totalAmount, next.amountPaid)
-        return next
-      }),
-    }))
-  }, [patchStore])
+          computePaymentStatus(
+            patch.totalAmount ?? current.totalAmount,
+            patch.amountPaid ?? current.amountPaid,
+          ),
+        synced: false,
+      }
+      if (opts?.editReason) {
+        const entry = {
+          reason: opts.editReason.trim(),
+          editedAt: new Date().toISOString(),
+          editedBy: opts.editedBy,
+        }
+        next.editReason = entry.reason
+        next.editHistory = [...(current.editHistory ?? []), entry]
+      }
+
+      patchStore((prev) => {
+        const workRecords = prev.workRecords.map((w) => (w.id === id ? next : w))
+        return {
+          ...prev,
+          workRecords,
+          customers: rebuildShopCustomers({
+            customers: prev.customers,
+            workRecords,
+            shopId: next.shopId,
+          }),
+        }
+      })
+
+      if (opts?.editReason) {
+        void (async () => {
+          const ok = await pushWorkUpdateToCloud({
+            record: next,
+            editReason: opts.editReason,
+            editedBy: opts.editedBy,
+          })
+          if (!ok) return
+          patchStore((prev) => ({
+            ...prev,
+            workRecords: prev.workRecords.map((w) =>
+              w.id === id ? { ...w, synced: true } : w,
+            ),
+          }))
+        })()
+      }
+    },
+    [patchStore],
+  )
 
   const deleteWorkRecord = useCallback((id: string) => {
-    patchStore((prev) => ({
-      ...prev,
-      workRecords: prev.workRecords.filter((w) => w.id !== id),
-      payments: prev.payments.filter((p) => p.workRecordId !== id),
-    }))
+    patchStore((prev) => {
+      const target = prev.workRecords.find((w) => w.id === id)
+      const workRecords = prev.workRecords.filter((w) => w.id !== id)
+      return {
+        ...prev,
+        workRecords,
+        payments: prev.payments.filter((p) => p.workRecordId !== id),
+        customers: target
+          ? rebuildShopCustomers({
+              customers: prev.customers,
+              workRecords,
+              shopId: target.shopId,
+            })
+          : prev.customers,
+      }
+    })
+    void deleteWorkFromCloud(id)
   }, [patchStore])
 
   const recordPayment = useCallback(
@@ -464,10 +517,18 @@ export function ShopProvider({ children }: { children: ReactNode }) {
     const pull = async () => {
       const cloud = await fetchWorkRecordsForShop(activeShopId)
       if (cancelled) return
-      patchStore((prev) => ({
-        ...prev,
-        workRecords: mergeWorkRecords(prev.workRecords, cloud, activeShopId),
-      }))
+      patchStore((prev) => {
+        const workRecords = mergeWorkRecords(prev.workRecords, cloud, activeShopId)
+        return {
+          ...prev,
+          workRecords,
+          customers: rebuildShopCustomers({
+            customers: prev.customers,
+            workRecords,
+            shopId: activeShopId,
+          }),
+        }
+      })
     }
 
     void pull()

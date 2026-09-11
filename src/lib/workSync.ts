@@ -23,6 +23,8 @@ export type CloudWorkRecord = {
   paymentStatus: PaymentStatus
   paymentMethod?: PaymentMethod
   notes?: string
+  editReason?: string
+  editHistory?: { reason: string; editedAt: string; editedBy?: string }[]
   createdAt: string
 }
 
@@ -46,6 +48,8 @@ export function mapCloudWorkRecord(row: CloudWorkRecord): WorkRecord {
     paymentStatus: row.paymentStatus,
     paymentMethod: row.paymentMethod,
     notes: row.notes,
+    editReason: row.editReason,
+    editHistory: row.editHistory,
     createdAt: row.createdAt,
     synced: true,
   }
@@ -79,6 +83,42 @@ export async function pushWorkRecordToCloud(
       notes: record.notes,
       createdAt: record.createdAt,
     })
+    return true
+  } catch {
+    return false
+  }
+}
+
+export async function pushWorkUpdateToCloud(input: {
+  record: WorkRecord
+  editReason: string
+  editedBy?: string
+}): Promise<boolean> {
+  if (!convexReady || !convexHttp) return false
+  try {
+    await convexHttp.mutation(api.workRecords.update, {
+      clientId: input.record.id,
+      customerName: input.record.customerName,
+      customerPhone: input.record.customerPhone,
+      totalAmount: input.record.totalAmount,
+      amountPaid: input.record.amountPaid,
+      amountPending: input.record.amountPending,
+      paymentStatus: input.record.paymentStatus,
+      paymentMethod: input.record.paymentMethod,
+      notes: input.record.notes,
+      editReason: input.editReason,
+      editedBy: input.editedBy,
+    })
+    return true
+  } catch {
+    return false
+  }
+}
+
+export async function deleteWorkFromCloud(clientId: string): Promise<boolean> {
+  if (!convexReady || !convexHttp) return false
+  try {
+    await convexHttp.mutation(api.workRecords.remove, { clientId })
     return true
   } catch {
     return false

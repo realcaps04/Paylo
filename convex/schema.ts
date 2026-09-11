@@ -87,6 +87,16 @@ export default defineSchema({
       ),
     ),
     notes: v.optional(v.string()),
+    editReason: v.optional(v.string()),
+    editHistory: v.optional(
+      v.array(
+        v.object({
+          reason: v.string(),
+          editedAt: v.string(),
+          editedBy: v.optional(v.string()),
+        }),
+      ),
+    ),
     createdAt: v.string(),
     createdAtMs: v.number(),
     updatedAt: v.number(),
