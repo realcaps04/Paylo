@@ -14,6 +14,7 @@ export default defineConfig({
       includeAssets: [
         'favicon.svg',
         'favicon.png',
+        'favicon-32.png',
         'paylo_applogo.png',
         'paylo-lockup.png',
         'apple-touch-icon.png',

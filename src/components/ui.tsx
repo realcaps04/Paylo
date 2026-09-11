@@ -371,6 +371,9 @@ export function LogoMark({
     <img
       src="/paylo_applogo.png"
       alt="Paylo"
+      width={160}
+      height={160}
+      decoding="async"
       className={cn(
         'shrink-0 object-contain',
         size === 'sm' && 'h-8 w-8',

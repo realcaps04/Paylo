@@ -43,7 +43,7 @@ export function MandatoryUpdateModal() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#eef5ff] ring-1 ring-[#0064f0]/15">
-              <LogoMark size="md" className="h-10 w-10 rounded-xl" />
+              <LogoMark size="md" className="h-10 w-10" />
             </div>
 
             <h2
