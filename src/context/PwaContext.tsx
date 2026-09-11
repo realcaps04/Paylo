@@ -47,8 +47,7 @@ function detectPlatform(): PwaContextValue['platform'] {
 function isStandalone() {
   return (
     window.matchMedia('(display-mode: standalone)').matches ||
-    // @ts-expect-error iOS
-    navigator.standalone === true
+    Boolean((navigator as Navigator & { standalone?: boolean }).standalone)
   )
 }
 
@@ -68,7 +67,7 @@ export function PwaProvider({ children }: { children: ReactNode }) {
     updateServiceWorker,
   } = useRegisterSW({
     immediate: true,
-    onRegisteredSW(_swUrl, registration) {
+    onRegisteredSW(_swUrl: string, registration: ServiceWorkerRegistration | undefined) {
       if (registration) {
         registrationRef.current = registration
       }
