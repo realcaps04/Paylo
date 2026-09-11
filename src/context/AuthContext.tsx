@@ -8,14 +8,26 @@ import {
   type ReactNode,
 } from 'react'
 import type { AuthSession, Role, User } from '@/types'
+import { getAccountByEmail, syncAccountFromSession } from '@/lib/accounts'
+import {
+  getGoogleClientId,
+  googleSetupHint,
+  signInWithGooglePopup,
+} from '@/lib/googleAuth'
 import { loadJSON, removeKey, saveJSON } from '@/lib/storage'
 import { uid } from '@/lib/format'
+import { createDemoStore } from '@/data/demo'
 
 interface AuthContextValue {
   session: AuthSession | null
   loading: boolean
+  busy: boolean
   error: string | null
-  loginWithGoogle: (asRole?: Role) => Promise<void>
+  googleReady: boolean
+  /** Real Google OAuth — login or signup based on existing account */
+  loginWithGoogle: (opts?: { intent?: 'login' | 'signup' }) => Promise<AuthSession>
+  /** Local demo personas for exploring the UI */
+  loginAsDemo: (kind: 'owner' | 'worker' | 'new') => Promise<void>
   loginWithEmail: (email: string, password: string) => Promise<void>
   logout: () => void
   setOnboarded: (value: boolean) => void
@@ -26,7 +38,16 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
-const DEMO_USERS: Record<string, { user: User; role: Role; shopIds: string[]; workerId?: string; onboarded: boolean }> = {
+const DEMO_USERS: Record<
+  string,
+  {
+    user: User
+    role: Role
+    shopIds: string[]
+    workerId?: string
+    onboarded: boolean
+  }
+> = {
   owner: {
     user: {
       id: 'u_owner',
@@ -69,10 +90,19 @@ const DEMO_USERS: Record<string, { user: User; role: Role; shopIds: string[]; wo
   },
 }
 
+function ensureDemoData() {
+  const store = loadJSON<{ shops?: unknown[] } | null>('store', null)
+  if (!store?.shops?.length) {
+    saveJSON('store', createDemoStore())
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<AuthSession | null>(null)
   const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const googleReady = Boolean(getGoogleClientId())
 
   useEffect(() => {
     const saved = loadJSON<AuthSession | null>('session', null)
@@ -82,50 +112,179 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const persist = useCallback((next: AuthSession | null) => {
     setSession(next)
-    if (next) saveJSON('session', next)
-    else removeKey('session')
+    if (next) {
+      saveJSON('session', next)
+      if (next.user.provider === 'google' || next.user.provider === 'email') {
+        syncAccountFromSession({
+          userId: next.user.id,
+          email: next.user.email,
+          name: next.user.name,
+          picture: next.user.picture ?? null,
+          role: next.role,
+          shopIds: next.shopIds,
+          workerId: next.workerId,
+          onboarded: next.onboarded,
+        })
+      }
+    } else {
+      removeKey('session')
+    }
   }, [])
 
-  const loginWithGoogle = useCallback(async (asRole: Role | 'new' = 'owner') => {
-    setError(null)
-    setLoading(true)
-    await new Promise((r) => setTimeout(r, 900))
-    const key = asRole === 'worker' ? 'worker' : asRole === 'manager' ? 'owner' : asRole
-    const demo = DEMO_USERS[key === 'owner' || key === 'worker' || key === 'new' ? key : 'owner']
-    // Allow choosing fresh onboarding via asRole cast
-    const pick = (asRole as string) === 'new' ? DEMO_USERS.new : demo
-    persist({
-      user: pick.user,
-      role: pick.role,
-      shopIds: [...pick.shopIds],
-      activeShopId: pick.shopIds[0] ?? null,
-      workerId: pick.workerId,
-      onboarded: pick.onboarded,
-    })
-    setLoading(false)
-  }, [persist])
+  const loginWithGoogle = useCallback(
+    async (opts?: { intent?: 'login' | 'signup' }) => {
+      setError(null)
+      setBusy(true)
+      try {
+        const profile = await signInWithGooglePopup()
+        const existing = getAccountByEmail(profile.email)
 
-  const loginWithEmail = useCallback(async (email: string, password: string) => {
-    setError(null)
-    setLoading(true)
-    await new Promise((r) => setTimeout(r, 700))
-    if (!email || !password || password.length < 4) {
-      setError('Invalid email or password.')
-      setLoading(false)
-      return
-    }
-    const isWorker = email.toLowerCase().includes('anjali')
-    const pick = isWorker ? DEMO_USERS.worker : DEMO_USERS.owner
-    persist({
-      user: { ...pick.user, email, provider: 'email' },
-      role: pick.role,
-      shopIds: [...pick.shopIds],
-      activeShopId: pick.shopIds[0] ?? null,
-      workerId: pick.workerId,
-      onboarded: true,
-    })
-    setLoading(false)
-  }, [persist])
+        const forceSignup = opts?.intent === 'signup'
+        const hasShop =
+          !forceSignup &&
+          Boolean(existing?.onboarded && existing.shopIds.length > 0)
+
+        const next: AuthSession = hasShop && existing
+          ? {
+              user: {
+                id: existing.userId || profile.id,
+                name: profile.name || existing.name,
+                email: profile.email,
+                avatar: profile.name
+                  .split(' ')
+                  .map((n) => n[0])
+                  .join('')
+                  .slice(0, 2)
+                  .toUpperCase(),
+                picture: profile.picture,
+                provider: 'google',
+              },
+              role: existing.role,
+              shopIds: [...existing.shopIds],
+              activeShopId: existing.shopIds[0] ?? null,
+              workerId: existing.workerId,
+              onboarded: true,
+            }
+          : {
+              user: {
+                id: profile.id,
+                name: profile.name,
+                email: profile.email,
+                avatar: profile.name
+                  .split(' ')
+                  .map((n) => n[0])
+                  .join('')
+                  .slice(0, 2)
+                  .toUpperCase(),
+                picture: profile.picture,
+                provider: 'google',
+              },
+              role: 'owner',
+              shopIds: forceSignup ? [] : existing?.shopIds ?? [],
+              activeShopId: forceSignup
+                ? null
+                : existing?.shopIds?.[0] ?? null,
+              workerId: forceSignup ? undefined : existing?.workerId,
+              onboarded: forceSignup
+                ? false
+                : Boolean(existing?.onboarded && (existing.shopIds?.length ?? 0) > 0),
+            }
+
+        // Fresh Google users with no shop start onboarding
+        if (!next.shopIds.length) {
+          next.onboarded = false
+          next.activeShopId = null
+        }
+
+        persist(next)
+        return next
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Google sign-in failed'
+        if (
+          message.includes('origin') ||
+          message.includes('redirect') ||
+          message.includes('400') ||
+          message.includes('missing_token')
+        ) {
+          setError(`${message}\n\n${googleSetupHint()}`)
+        } else {
+          setError(message)
+        }
+        throw err
+      } finally {
+        setBusy(false)
+      }
+    },
+    [persist],
+  )
+
+  const loginAsDemo = useCallback(
+    async (kind: 'owner' | 'worker' | 'new') => {
+      setError(null)
+      setBusy(true)
+      await new Promise((r) => setTimeout(r, 500))
+      if (kind !== 'new') ensureDemoData()
+      const pick = DEMO_USERS[kind]
+      persist({
+        user: pick.user,
+        role: pick.role,
+        shopIds: [...pick.shopIds],
+        activeShopId: pick.shopIds[0] ?? null,
+        workerId: pick.workerId,
+        onboarded: pick.onboarded,
+      })
+      setBusy(false)
+    },
+    [persist],
+  )
+
+  const loginWithEmail = useCallback(
+    async (email: string, password: string) => {
+      setError(null)
+      setBusy(true)
+      await new Promise((r) => setTimeout(r, 500))
+      if (!email || !password || password.length < 4) {
+        setError('Invalid email or password.')
+        setBusy(false)
+        return
+      }
+
+      const existing = getAccountByEmail(email)
+      if (existing?.onboarded && existing.shopIds.length) {
+        persist({
+          user: {
+            id: existing.userId,
+            name: existing.name,
+            email: existing.email,
+            picture: existing.picture ?? undefined,
+            provider: 'email',
+          },
+          role: existing.role,
+          shopIds: [...existing.shopIds],
+          activeShopId: existing.shopIds[0] ?? null,
+          workerId: existing.workerId,
+          onboarded: true,
+        })
+        setBusy(false)
+        return
+      }
+
+      // Demo shortcut for exploring without Google
+      const isWorker = email.toLowerCase().includes('anjali')
+      ensureDemoData()
+      const pick = isWorker ? DEMO_USERS.worker : DEMO_USERS.owner
+      persist({
+        user: { ...pick.user, email, provider: 'email' },
+        role: pick.role,
+        shopIds: [...pick.shopIds],
+        activeShopId: pick.shopIds[0] ?? null,
+        workerId: pick.workerId,
+        onboarded: true,
+      })
+      setBusy(false)
+    },
+    [persist],
+  )
 
   const logout = useCallback(() => {
     persist(null)
@@ -169,8 +328,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       session,
       loading,
+      busy,
       error,
+      googleReady,
       loginWithGoogle,
+      loginAsDemo,
       loginWithEmail,
       logout,
       setOnboarded,
@@ -181,8 +343,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [
       session,
       loading,
+      busy,
       error,
+      googleReady,
       loginWithGoogle,
+      loginAsDemo,
       loginWithEmail,
       logout,
       setOnboarded,

@@ -253,11 +253,28 @@ export function PageHeader({
 
 export function Avatar({
   name,
+  picture,
   size = 'md',
 }: {
   name: string
+  picture?: string | null
   size?: 'sm' | 'md' | 'lg'
 }) {
+  if (picture) {
+    return (
+      <img
+        src={picture}
+        alt={name}
+        className={cn(
+          'shrink-0 rounded-full object-cover',
+          size === 'sm' && 'h-8 w-8',
+          size === 'md' && 'h-10 w-10',
+          size === 'lg' && 'h-14 w-14',
+        )}
+        referrerPolicy="no-referrer"
+      />
+    )
+  }
   const initials = name
     .split(' ')
     .map((n) => n[0])

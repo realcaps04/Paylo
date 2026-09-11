@@ -11,7 +11,14 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'prompt',
-      includeAssets: ['favicon.svg', 'favicon.png', 'paylo_applogo.png', 'apple-touch-icon.png', 'offline.html'],
+      includeAssets: [
+        'favicon.svg',
+        'favicon.png',
+        'paylo_applogo.png',
+        'apple-touch-icon.png',
+        'offline.html',
+        'google-callback.html',
+      ],
       manifest: {
         name: 'Paylo — Shop Management',
         short_name: 'Paylo',

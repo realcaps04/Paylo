@@ -255,7 +255,11 @@ export function AppShell({ children }: { children: ReactNode }) {
                 onClick={() => navigate('/app/settings')}
                 className="flex items-center gap-2 rounded-btn border border-surface-border bg-white px-2 py-1.5 hover:bg-slate-50"
               >
-                <Avatar name={session?.user.name ?? 'U'} size="sm" />
+                <Avatar
+                  name={session?.user.name ?? 'U'}
+                  picture={session?.user.picture}
+                  size="sm"
+                />
                 <span className="hidden text-sm font-medium text-ink md:inline">
                   {session?.user.name?.split(' ')[0]}
                 </span>

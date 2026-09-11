@@ -9,6 +9,7 @@ export interface User {
   email: string
   phone?: string
   avatar?: string
+  picture?: string | null
   provider: 'google' | 'email'
 }
 
