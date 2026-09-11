@@ -5,11 +5,7 @@ import {
   BarChart3,
   ChevronDown,
   ChevronRight,
-  CreditCard,
-  Package,
   Plus,
-  QrCode,
-  ShoppingBag,
   Store,
   UserPlus,
   Users,
@@ -56,7 +52,6 @@ function OwnerDashboard() {
   const navigate = useNavigate()
   const [shopOpen, setShopOpen] = useState(false)
 
-  const firstName = session?.user.name?.split(' ')[0] ?? 'there'
   const shops = store.shops.filter((s) => session?.shopIds.includes(s.id))
 
   const todayRecords = useMemo(
@@ -72,10 +67,6 @@ function OwnerDashboard() {
   const yesterdaySales = sumField(yesterdayRecords, 'amountPaid')
   const salesDelta = pctChange(todaySales, yesterdaySales)
 
-  const todayOrders = todayRecords.length
-  const yesterdayOrders = yesterdayRecords.length
-  const ordersDelta = pctChange(todayOrders, yesterdayOrders)
-
   const totalCustomers = customers.length
   const shopStaff = workers.filter((w) => w.active && w.role !== 'owner').length
   const totalServices = services.filter((s) => s.active).length
@@ -90,44 +81,17 @@ function OwnerDashboard() {
 
   const quickActions = [
     {
-      to: '/app/work/new',
-      label: 'New Sale',
-      icon: CreditCard,
-      tone: 'bg-[#0064f0] text-white shadow-md shadow-[#0064f0]/25',
-    },
-    {
-      to: '/app/services',
-      label: 'Add Service',
-      icon: Package,
-      tone: 'bg-[#e8f8ef] text-[#1a9b4a]',
-    },
-    {
       to: '/app/workers',
       label: 'Add Staff',
       icon: UserPlus,
       tone: 'bg-[#efeaff] text-[#6b4ad6]',
     },
-    {
-      to: '/app/payments',
-      label: 'Collect Pay',
-      icon: QrCode,
-      tone: 'bg-[#e8f1ff] text-[#0064f0]',
-    },
   ] as const
 
   return (
     <div className="space-y-5 pb-2">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="font-display text-[1.65rem] font-bold tracking-tight text-[#0f1a33]">
-            {greeting()}, {firstName}!
-          </h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Here&apos;s what&apos;s happening at your shop today.
-          </p>
-        </div>
-
-        {shops.length > 0 && (
+      {shops.length > 0 && (
+        <div className="flex justify-end">
           <div className="relative shrink-0">
             <button
               type="button"
@@ -173,12 +137,12 @@ function OwnerDashboard() {
               </div>
             )}
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3">
-        <div className="relative col-span-1 overflow-hidden rounded-[22px] bg-gradient-to-br from-[#1a7bff] via-[#0064f0] to-[#0047b8] p-4 text-white shadow-lg shadow-[#0064f0]/25">
+        <div className="relative col-span-2 overflow-hidden rounded-[22px] bg-gradient-to-br from-[#1a7bff] via-[#0064f0] to-[#0047b8] p-4 text-white shadow-lg shadow-[#0064f0]/25">
           <div className="pointer-events-none absolute inset-0 opacity-40">
             <svg className="absolute -right-2 bottom-2 h-20 w-28" viewBox="0 0 120 80" fill="none">
               <path
@@ -217,26 +181,6 @@ function OwnerDashboard() {
           </div>
         </div>
 
-        <div className="rounded-[22px] border border-slate-200/80 bg-white p-4 shadow-sm">
-          <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-xl bg-[#eef5ff] text-[#0064f0]">
-            <ShoppingBag className="h-[18px] w-[18px]" />
-          </div>
-          <p className="text-[13px] font-medium text-slate-500">Total Orders</p>
-          <p className="mt-1 font-display text-[1.55rem] font-bold tracking-tight text-[#0f1a33]">
-            {todayOrders}
-          </p>
-          <p
-            className={cn(
-              'mt-2 inline-flex items-center gap-0.5 text-xs font-semibold',
-              ordersDelta >= 0 ? 'text-[#1a9b4a]' : 'text-red-500',
-            )}
-          >
-            {ordersDelta >= 0 && <ArrowUpRight className="h-3.5 w-3.5" />}
-            {ordersDelta >= 0 ? '+' : ''}
-            {ordersDelta}%
-          </p>
-        </div>
-
         <Link
           to="/app/customers"
           className="flex items-center justify-between rounded-[22px] border border-slate-200/80 bg-white p-4 shadow-sm transition hover:border-[#cfe0ff]"
@@ -270,7 +214,7 @@ function OwnerDashboard() {
       </div>
 
       {/* Quick actions */}
-      <div className="grid grid-cols-4 gap-2">
+      <div className="flex justify-start">
         {quickActions.map((a) => (
           <Link key={a.to} to={a.to} className="flex flex-col items-center gap-2 py-1">
             <span
@@ -302,14 +246,10 @@ function OwnerDashboard() {
         <div className="space-y-2.5">
           {recent.length === 0 && (
             <div className="rounded-[20px] border border-dashed border-slate-200 bg-slate-50/60 px-4 py-10 text-center">
-              <p className="text-sm font-medium text-slate-600">No sales yet today</p>
-              <Link
-                to="/app/work/new"
-                className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-[#0064f0]"
-              >
-                <Plus className="h-4 w-4" />
-                Record your first sale
-              </Link>
+              <p className="text-sm font-medium text-slate-600">No sales yet</p>
+              <p className="mt-1 text-xs text-slate-400">
+                Sales recorded by your staff will show up here.
+              </p>
             </div>
           )}
           {recent.map((r) => (

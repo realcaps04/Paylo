@@ -158,16 +158,18 @@ export function WorkersPage() {
                   <Button size="sm" variant="outline" onClick={() => openEdit(w)}>
                     Edit
                   </Button>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => {
-                      updateWorker(w.id, { active: !w.active })
-                      toast(w.active ? 'Worker deactivated' : 'Worker activated')
-                    }}
-                  >
-                    {w.active ? 'Deactivate' : 'Activate'}
-                  </Button>
+                  {w.role !== 'owner' && (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => {
+                        updateWorker(w.id, { active: !w.active })
+                        toast(w.active ? 'Worker deactivated' : 'Worker activated')
+                      }}
+                    >
+                      {w.active ? 'Deactivate' : 'Activate'}
+                    </Button>
+                  )}
                   {w.role !== 'owner' && (
                     <Button
                       size="sm"

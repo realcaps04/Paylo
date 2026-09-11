@@ -1,6 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
-  Bell,
   Briefcase,
   ChartColumn,
   ChevronDown,
@@ -19,7 +18,7 @@ import { useState, type ReactNode } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { useShop } from '@/context/ShopContext'
 import { usePwa } from '@/context/PwaContext'
-import { Avatar, Badge, Button, Logo } from '@/components/ui'
+import { Avatar, Button, Logo } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { canAccess } from '@/lib/permissions'
 import type { Role } from '@/types'
@@ -61,17 +60,15 @@ function mobileOwnerNav() {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { session, setActiveShop } = useAuth()
-  const { shop, store, notifications, online, syncing } = useShop()
+  const { shop, store, online, syncing } = useShop()
   const { canInstall, promptInstall } = usePwa()
   const navigate = useNavigate()
   const [shopOpen, setShopOpen] = useState(false)
-  const [notifOpen, setNotifOpen] = useState(false)
   const [search, setSearch] = useState('')
   const role = session?.role ?? 'worker'
   const isWorker = role === 'worker'
   const sideNav = isWorker ? workerNav().filter((n) => !('primary' in n && n.primary)) : ownerNav(role)
   const bottomNav = isWorker ? workerNav() : mobileOwnerNav()
-  const unread = notifications.filter((n) => !n.read).length
 
   const shops = store.shops.filter((s) => session?.shopIds.includes(s.id))
 
@@ -198,50 +195,10 @@ export function AppShell({ children }: { children: ReactNode }) {
                 />
               </div>
 
-              <div className="relative ml-auto md:ml-0">
-                <button
-                  type="button"
-                  onClick={() => setNotifOpen((v) => !v)}
-                  className="relative flex h-10 w-10 items-center justify-center rounded-btn border border-surface-border bg-white hover:bg-slate-50"
-                >
-                  <Bell className="h-4 w-4 text-ink-soft" />
-                  {unread > 0 && (
-                    <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-red-500" />
-                  )}
-                </button>
-                {notifOpen && (
-                  <div className="absolute right-0 top-full z-40 mt-1 w-80 rounded-card border border-surface-border bg-white p-2 shadow-soft">
-                    <div className="mb-2 flex items-center justify-between px-2">
-                      <p className="text-sm font-semibold">Notifications</p>
-                      <Badge tone="brand">{unread} new</Badge>
-                    </div>
-                    <div className="max-h-72 space-y-1 overflow-y-auto">
-                      {notifications.length === 0 && (
-                        <p className="px-2 py-6 text-center text-sm text-ink-muted">
-                          No notifications yet
-                        </p>
-                      )}
-                      {notifications.slice(0, 8).map((n) => (
-                        <div
-                          key={n.id}
-                          className={cn(
-                            'rounded-lg px-3 py-2',
-                            !n.read ? 'bg-brand-50/60' : 'hover:bg-slate-50',
-                          )}
-                        >
-                          <p className="text-sm font-medium text-ink">{n.title}</p>
-                          <p className="text-xs text-ink-muted">{n.body}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
               <button
                 type="button"
                 onClick={() => navigate('/app/settings')}
-                className="flex items-center gap-2 rounded-full border border-surface-border bg-white py-1 pl-1 pr-2.5 hover:bg-slate-50 sm:pr-3"
+                className="ml-auto flex items-center gap-2 rounded-full border border-surface-border bg-white py-1 pl-1 pr-2.5 hover:bg-slate-50 sm:pr-3 md:ml-0"
               >
                 <Avatar
                   name={session?.user.name ?? 'U'}
