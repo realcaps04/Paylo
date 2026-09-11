@@ -21,7 +21,7 @@ import {
   Select,
   Textarea,
 } from '@/components/ui'
-import { formatINR, greeting } from '@/lib/format'
+import { formatINR } from '@/lib/format'
 import { filterByDateRange, sumField } from '@/lib/permissions'
 import { cn } from '@/lib/cn'
 import type { PaymentMethod, WorkRecord } from '@/types'
@@ -40,7 +40,6 @@ export function StaffHomePage() {
   const { toast } = useToast()
 
   const workerId = session?.workerId
-  const firstName = session?.user.name?.split(' ')[0] ?? 'there'
 
   const mine = useMemo(
     () => workRecords.filter((r) => r.workerId === workerId),
@@ -133,13 +132,9 @@ export function StaffHomePage() {
 
   return (
     <div className="mx-auto max-w-lg space-y-5 pb-2">
-      <div>
-        <p className="text-[13px] font-medium text-slate-500">{shop?.name ?? 'Your shop'}</p>
-        <h1 className="mt-1 font-display text-[26px] font-extrabold leading-tight tracking-[-0.03em] text-[#0f1a33]">
-          {greeting()}, {firstName}!
-        </h1>
-        <p className="mt-1 text-[14px] text-slate-500">Let&apos;s keep your shop moving.</p>
-      </div>
+      {shop?.name && (
+        <p className="text-[13px] font-medium text-slate-500">{shop.name}</p>
+      )}
 
       <div className="rounded-[22px] bg-[#0064f0] px-5 py-5 text-white shadow-lg shadow-[#0064f0]/28">
         <div className="flex items-start justify-between gap-3">
