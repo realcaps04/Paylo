@@ -4,6 +4,8 @@ import { useNavigate } from 'react-router-dom'
 import { LogoMark } from '@/components/ui'
 import { useAuth } from '@/context/AuthContext'
 import { cn } from '@/lib/cn'
+import { convex, convexReady } from '@/lib/convex'
+import { api } from '../../../convex/_generated/api'
 
 function ProgressDots({ active }: { active: number }) {
   return (
@@ -125,8 +127,21 @@ export function ChooseRolePage() {
   const navigate = useNavigate()
   const { session, chooseRole, logout } = useAuth()
 
-  const pick = (role: 'owner' | 'worker') => {
+  const pick = async (role: 'owner' | 'worker') => {
     chooseRole(role)
+    if (convexReady && convex && session?.user.email) {
+      try {
+        await convex.mutation(api.users.upsertByEmail, {
+          email: session.user.email,
+          name: session.user.name,
+          picture: session.user.picture,
+          googleId: session.user.id,
+          role,
+        })
+      } catch {
+        // continue offline / local
+      }
+    }
     if (role === 'owner') navigate('/onboarding')
     else navigate('/onboarding/join')
   }
@@ -170,20 +185,7 @@ export function ChooseRolePage() {
           transition={{ duration: 0.4 }}
           className="mt-4 flex flex-col items-center text-center"
         >
-          <div className="flex items-center gap-2.5">
-            <LogoMark size="md" className="h-11 w-11" />
-            <div className="flex items-end">
-              <img
-                src="/paylo-p-glyph.png"
-                alt=""
-                aria-hidden
-                className="h-8 w-auto translate-y-[5px] select-none"
-              />
-              <span className="font-display text-[28px] font-extrabold leading-none tracking-[-0.03em] text-[#0f1a33]">
-                aylo
-              </span>
-            </div>
-          </div>
+          <LogoMark size="lg" className="h-14 w-14" />
           <p className="mt-2 text-[13px] font-medium text-slate-500">
             Work Today. Grow Tomorrow.
           </p>
@@ -218,7 +220,7 @@ export function ChooseRolePage() {
             initial={{ opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1, duration: 0.4 }}
-            onClick={() => pick('owner')}
+            onClick={() => void pick('owner')}
             className="group relative w-full overflow-hidden rounded-[24px] bg-white p-5 text-left shadow-[0_14px_40px_rgba(18,50,110,0.10)] ring-1 ring-slate-100 transition hover:shadow-[0_18px_46px_rgba(18,50,110,0.16)] active:scale-[0.99]"
           >
             <div className="flex items-start gap-3 pr-14">
@@ -246,7 +248,7 @@ export function ChooseRolePage() {
             initial={{ opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.16, duration: 0.4 }}
-            onClick={() => pick('worker')}
+            onClick={() => void pick('worker')}
             className="group relative w-full overflow-hidden rounded-[24px] bg-white p-5 text-left shadow-[0_14px_40px_rgba(18,50,110,0.10)] ring-1 ring-slate-100 transition hover:shadow-[0_18px_46px_rgba(18,50,110,0.16)] active:scale-[0.99]"
           >
             <div className="flex items-start gap-3 pr-14">

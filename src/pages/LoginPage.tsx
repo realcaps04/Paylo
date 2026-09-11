@@ -317,7 +317,7 @@ export function LoginPage() {
                 <span className="block whitespace-nowrap">Smarter Payments for</span>
                 <span className="block whitespace-nowrap text-[#0064f0]">Growing Shops</span>
               </h1>
-              <p className="mt-3 text-[12.5px] leading-[1.5] text-slate-500">
+              <p className="mt-5 text-[12.5px] leading-[1.5] text-slate-500">
                 <span className="block whitespace-nowrap">
                   Accept payments, track sales and manage your shop —
                 </span>
@@ -362,6 +362,7 @@ export function LoginPage() {
             initial={{ opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.26, duration: 0.45, ease: 'easeOut' }}
+            className="-translate-y-3"
           >
             {setupError && (
               <div className="mb-3 whitespace-pre-line rounded-2xl border border-red-100 bg-red-50 px-4 py-2.5 text-center text-[13px] leading-relaxed text-red-700">

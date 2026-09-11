@@ -14,6 +14,8 @@ import {
   googleSetupHint,
   signInWithGooglePopup,
 } from '@/lib/googleAuth'
+import { convex, convexReady } from '@/lib/convex'
+import { api } from '../../convex/_generated/api'
 import { loadJSON, removeKey, saveJSON } from '@/lib/storage'
 import { uid } from '@/lib/format'
 import { createDemoStore } from '@/data/demo'
@@ -199,6 +201,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           next.onboarded = false
           next.activeShopId = null
           next.roleChosen = false
+        }
+
+        // Record / update the user in Convex keyed by Google email
+        if (convexReady && convex) {
+          try {
+            await convex.mutation(api.users.upsertByEmail, {
+              email: profile.email,
+              name: profile.name,
+              picture: profile.picture,
+              googleId: profile.id,
+              role: next.role,
+            })
+          } catch {
+            // Local auth still works if Convex is briefly unreachable
+          }
         }
 
         persist(next)

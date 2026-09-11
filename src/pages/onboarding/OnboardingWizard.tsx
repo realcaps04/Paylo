@@ -1,600 +1,561 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { motion, AnimatePresence } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
 import {
-  Check,
-  ChevronLeft,
-  ChevronRight,
-  Plus,
+  ArrowLeft,
+  ArrowRight,
+  BookOpen,
+  Building2,
+  Camera,
+  Dumbbell,
+  Grid2X2,
+  Home,
+  LayoutGrid,
+  MapPin,
+  Monitor,
+  Phone,
+  ScanLine,
   Search,
-  Trash2,
-  UserPlus,
+  ShoppingCart,
+  Shirt,
+  Store,
+  UtensilsCrossed,
 } from 'lucide-react'
-import { CATEGORY_GROUPS, SHOP_CATEGORIES } from '@/data/categories'
+import { BUSINESS_TYPES, INDIAN_STATES, ONBOARDING_CATEGORIES } from '@/data/onboarding'
 import { useAuth } from '@/context/AuthContext'
 import { useShop } from '@/context/ShopContext'
 import { usePwa } from '@/context/PwaContext'
 import { useToast } from '@/context/ToastContext'
-import {
-  Button,
-  Card,
-  Field,
-  Input,
-  Label,
-  Logo,
-  Select,
-  Textarea,
-} from '@/components/ui'
+import { useShopSetupApi } from '@/lib/shopSetup'
+import { Button } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { uid } from '@/lib/format'
-import type { Worker } from '@/types'
+import type { Id } from '../../../convex/_generated/dataModel'
 
-const STEPS = [
-  { id: 1, label: 'Business' },
-  { id: 2, label: 'Category' },
-  { id: 3, label: 'Details' },
-  { id: 4, label: 'Team' },
-  { id: 5, label: 'Finish' },
+const STEP_META = [
+  {
+    title: "Let's Set Up Your Shop",
+    subtitle: 'Tell us some basic details about your shop to get started.',
+  },
+  {
+    title: 'Add Your Shop Address',
+    subtitle: 'This helps us set your location and appear in local searches.',
+  },
+  {
+    title: 'Add Contact Details',
+    subtitle: 'Customers will use this to reach your shop.',
+  },
+  {
+    title: 'Select Shop Category',
+    subtitle: 'Choose the category that best describes your shop.',
+  },
 ] as const
 
-const SALON_CATEGORY_IDS = new Set([
-  'beauty-parlour',
-  'unisex-salon',
-  'mens-salon',
-  'womens-salon',
-  'barber',
-  'spa',
-  'nail',
-  'makeup',
-  'skincare',
-])
+const CATEGORY_ICONS: Record<string, typeof ShoppingCart> = {
+  cart: ShoppingCart,
+  hanger: Shirt,
+  monitor: Monitor,
+  burger: UtensilsCrossed,
+  bottle: Store,
+  home: Home,
+  dumbbell: Dumbbell,
+  book: BookOpen,
+  grid: LayoutGrid,
+}
 
-type DraftWorker = {
-  key: string
-  name: string
-  phone: string
-  email: string
-  role: 'worker' | 'manager'
+function ProgressBar({ step }: { step: number }) {
+  return (
+    <div className="flex flex-1 items-center gap-1.5 px-4">
+      {Array.from({ length: 4 }, (_, i) => (
+        <span
+          key={i}
+          className={cn(
+            'h-[5px] flex-1 rounded-full transition-colors',
+            i < step ? 'bg-[#0064f0]' : 'bg-slate-200',
+          )}
+        />
+      ))}
+    </div>
+  )
+}
+
+function FieldShell({
+  icon,
+  children,
+  label,
+}: {
+  icon: ReactNode
+  children: ReactNode
+  label?: string
+}) {
+  return (
+    <label className="block">
+      {label && (
+        <span className="mb-1.5 block text-[13px] font-semibold text-[#0f1a33]">{label}</span>
+      )}
+      <div className="flex h-12 items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3.5 shadow-[0_1px_2px_rgba(15,23,42,0.03)] focus-within:border-[#0064f0] focus-within:ring-2 focus-within:ring-[#0064f0]/15">
+        <span className="text-[#0064f0]">{icon}</span>
+        {children}
+      </div>
+    </label>
+  )
 }
 
 export function OnboardingWizard() {
   const navigate = useNavigate()
-  const { session, attachShop, setOnboarded, clearRoleChoice, logout } = useAuth()
+  const { session, attachShop, clearRoleChoice, logout } = useAuth()
   const { addShop, addWorker, addService } = useShop()
   const { setShowInstallHint } = usePwa()
   const { toast } = useToast()
+  const shopApi = useShopSetupApi()
+  const fileRef = useRef<HTMLInputElement>(null)
 
   const [step, setStep] = useState(1)
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const [logoFile, setLogoFile] = useState<File | null>(null)
+  const [logoPreview, setLogoPreview] = useState<string | null>(null)
   const [shopName, setShopName] = useState('')
-  const [ownerName, setOwnerName] = useState(session?.user.name ?? '')
-  const [categoryId, setCategoryId] = useState('')
-  const [categoryName, setCategoryName] = useState('')
-  const [customCategory, setCustomCategory] = useState('')
-  const [showCustom, setShowCustom] = useState(false)
-  const [categoryQuery, setCategoryQuery] = useState('')
-  const [phone, setPhone] = useState('')
-  const [email, setEmail] = useState(session?.user.email ?? '')
+  const [businessType, setBusinessType] = useState('')
   const [address, setAddress] = useState('')
   const [city, setCity] = useState('')
-  const [state, setState] = useState('')
+  const [stateName, setStateName] = useState('')
   const [pinCode, setPinCode] = useState('')
-  const [description, setDescription] = useState('')
-  const [openHour, setOpenHour] = useState('09:00')
-  const [closeHour, setCloseHour] = useState('20:00')
-  const [workers, setWorkers] = useState<DraftWorker[]>([])
-  const [inviteName, setInviteName] = useState('')
-  const [invitePhone, setInvitePhone] = useState('')
-  const [inviteEmail, setInviteEmail] = useState('')
+  const [contactNumber, setContactNumber] = useState('')
+  const [alternateNumber, setAlternateNumber] = useState('')
+  const [whatsappNumber, setWhatsappNumber] = useState('')
+  const [categoryId, setCategoryId] = useState('general-store')
+  const [categoryQuery, setCategoryQuery] = useState('')
 
   const filteredCategories = useMemo(() => {
     const q = categoryQuery.trim().toLowerCase()
-    if (!q) return SHOP_CATEGORIES
-    return SHOP_CATEGORIES.filter(
-      (c) =>
-        c.name.toLowerCase().includes(q) ||
-        c.description.toLowerCase().includes(q) ||
-        c.group.toLowerCase().includes(q),
-    )
+    if (!q) return ONBOARDING_CATEGORIES
+    return ONBOARDING_CATEGORIES.filter((c) => c.name.toLowerCase().includes(q))
   }, [categoryQuery])
 
   const canNext = () => {
-    if (step === 1) return shopName.trim().length > 1 && ownerName.trim().length > 1
+    if (step === 1) return shopName.trim().length > 1 && Boolean(businessType)
     if (step === 2) {
-      if (showCustom) return customCategory.trim().length > 1
-      return !!categoryId
+      return (
+        address.trim().length > 2 &&
+        city.trim().length > 1 &&
+        Boolean(stateName) &&
+        pinCode.trim().length >= 4
+      )
     }
-    if (step === 3) return phone.trim().length >= 8 && city.trim().length > 0
+    if (step === 3) return contactNumber.trim().length >= 8
+    if (step === 4) return Boolean(categoryId)
     return true
   }
 
-  const addInvite = () => {
-    if (!inviteName.trim()) return
-    setWorkers((prev) => [
-      ...prev,
-      {
-        key: uid('dw'),
-        name: inviteName.trim(),
-        phone: invitePhone.trim(),
-        email: inviteEmail.trim(),
-        role: 'worker',
-      },
-    ])
-    setInviteName('')
-    setInvitePhone('')
-    setInviteEmail('')
+  const onLogoPick = (file: File | null) => {
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      setError('Please choose a PNG or JPG image.')
+      return
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setError('Logo must be under 2MB.')
+      return
+    }
+    setError(null)
+    setLogoFile(file)
+    setLogoPreview(URL.createObjectURL(file))
   }
 
   const finish = async () => {
-    setSaving(true)
-    const shopId = uid('shop')
-    const resolvedCategoryId = showCustom ? 'custom' : categoryId
-    const resolvedCategoryName = showCustom
-      ? customCategory.trim()
-      : categoryName || SHOP_CATEGORIES.find((c) => c.id === categoryId)?.name || 'Business'
-
-    const ownerWorkerId = uid('w')
-    addShop({
-      id: shopId,
-      name: shopName.trim(),
-      categoryId: resolvedCategoryId,
-      categoryName: resolvedCategoryName,
-      ownerName: ownerName.trim(),
-      phone: phone.trim(),
-      email: email.trim(),
-      address: address.trim(),
-      city: city.trim(),
-      state: state.trim(),
-      pinCode: pinCode.trim(),
-      description: description.trim(),
-      hours: { open: openHour, close: closeHour, holidays: [] },
-      createdAt: new Date().toISOString(),
-    })
-
-    const owner: Omit<Worker, 'id'> & { id?: string } = {
-      id: ownerWorkerId,
-      shopId,
-      userId: session?.user.id,
-      name: ownerName.trim(),
-      role: 'owner',
-      phone: phone.trim(),
-      email: email.trim(),
-      employeeId: 'EMP-000',
-      joiningDate: new Date().toISOString(),
-      specialization: 'Owner',
-      active: true,
-      inviteStatus: 'joined',
+    if (!session?.user.email) {
+      setError('Missing signed-in email. Please sign in again.')
+      return
     }
-    addWorker(owner)
+    const category = ONBOARDING_CATEGORIES.find((c) => c.id === categoryId)
+    if (!category) {
+      setError('Select a shop category.')
+      return
+    }
 
-    workers.forEach((w, i) => {
+    setSaving(true)
+    setError(null)
+    try {
+      let logoStorageId: Id<'_storage'> | undefined
+      if (logoFile && shopApi.ready) {
+        logoStorageId = await shopApi.uploadLogo(logoFile)
+      }
+
+      const convexShopId = await shopApi.saveShop({
+        ownerEmail: session.user.email,
+        ownerName: session.user.name,
+        ownerPicture: session.user.picture,
+        googleId: session.user.id,
+        shopName: shopName.trim(),
+        businessType,
+        logoStorageId,
+        address: address.trim(),
+        city: city.trim(),
+        state: stateName,
+        pinCode: pinCode.trim(),
+        contactNumber: contactNumber.trim(),
+        alternateNumber: alternateNumber.trim() || undefined,
+        whatsappNumber: whatsappNumber.trim() || undefined,
+        categoryId: category.id,
+        categoryName: category.name,
+      })
+
+      const shopId = convexShopId ? String(convexShopId) : uid('shop')
+      const ownerWorkerId = uid('w')
+
+      addShop({
+        id: shopId,
+        name: shopName.trim(),
+        categoryId: category.id,
+        categoryName: category.name,
+        ownerName: session.user.name,
+        phone: contactNumber.trim(),
+        email: session.user.email,
+        address: address.trim(),
+        city: city.trim(),
+        state: stateName,
+        pinCode: pinCode.trim(),
+        description: `${businessType} · ${category.name}`,
+        logo: logoPreview ?? undefined,
+        hours: { open: '09:00', close: '20:00', holidays: [] },
+        createdAt: new Date().toISOString(),
+      })
+
       addWorker({
+        id: ownerWorkerId,
         shopId,
-        name: w.name,
-        role: w.role,
-        phone: w.phone,
-        email: w.email,
-        employeeId: `EMP-${String(i + 1).padStart(3, '0')}`,
-        joiningDate: new Date().toISOString(),
+        userId: session.user.id,
+        name: session.user.name,
+        role: 'owner',
+        phone: contactNumber.trim(),
+        email: session.user.email,
+        employeeId: 'OWN-001',
+        joiningDate: new Date().toISOString().slice(0, 10),
         active: true,
-        inviteStatus: w.email || w.phone ? 'pending' : 'none',
+        inviteStatus: 'joined',
       })
-    })
 
-    const defaults = SALON_CATEGORY_IDS.has(resolvedCategoryId)
-      ? [
-          { name: 'Haircut', category: 'Hair', price: 350, mins: 30 },
-          { name: 'Facial', category: 'Skin', price: 800, mins: 45 },
-          { name: 'Beard Trim', category: 'Grooming', price: 150, mins: 15 },
-        ]
-      : [
-          { name: 'Service A', category: 'General', price: 500, mins: 30 },
-          { name: 'Consultation', category: 'General', price: 300, mins: 20 },
-          { name: 'Standard Job', category: 'General', price: 1000, mins: 60 },
-        ]
-
-    defaults.forEach((s) => {
-      addService({
-        shopId,
-        name: s.name,
-        category: s.category,
-        defaultPrice: s.price,
-        durationMinutes: s.mins,
-        description: `${s.name} for ${resolvedCategoryName}`,
-        active: true,
+      ;[
+        { name: 'Standard Service', category: 'General', price: 500, mins: 30 },
+        { name: 'Consultation', category: 'General', price: 300, mins: 20 },
+      ].forEach((s) => {
+        addService({
+          shopId,
+          name: s.name,
+          category: s.category,
+          defaultPrice: s.price,
+          durationMinutes: s.mins,
+          description: `${s.name} for ${category.name}`,
+          active: true,
+        })
       })
-    })
 
-    attachShop(shopId, 'owner', ownerWorkerId)
-    setOnboarded(true)
-    setShowInstallHint(true)
-    toast('Your shop is ready!')
-    setSaving(false)
-    navigate('/app')
+      attachShop(shopId, 'owner', ownerWorkerId)
+      setShowInstallHint(true)
+      toast(shopApi.ready ? 'Shop saved to Paylo cloud' : 'Shop created locally')
+      navigate('/app')
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Could not save shop'
+      setError(message)
+      toast(message, 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const goNext = () => {
+    setError(null)
+    if (!canNext()) {
+      setError('Please fill the required fields to continue.')
+      return
+    }
+    if (step < 4) setStep((s) => s + 1)
+    else void finish()
+  }
+
+  const goBack = () => {
+    setError(null)
+    if (step === 1) {
+      clearRoleChoice()
+      navigate('/onboarding/role')
+      return
+    }
+    setStep((s) => s - 1)
+  }
+
+  const skip = () => {
+    logout()
+    navigate('/login')
   }
 
   return (
-    <div className="min-h-dvh bg-white">
-      <div className="mx-auto max-w-3xl px-4 py-8 md:py-12">
-        <div className="mb-8 flex items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-2">
-            {step === 1 && (
-              <button
-                type="button"
-                aria-label="Back to role"
-                onClick={() => {
-                  clearRoleChoice()
-                  navigate('/onboarding/role')
-                }}
-                className="mr-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-ink hover:bg-slate-100"
-              >
-                <ChevronLeft className="h-5 w-5" />
-              </button>
-            )}
-            <Logo />
-          </div>
-          <div className="flex shrink-0 items-center gap-3">
-            <p className="hidden text-sm text-ink-muted sm:block">
-              Step {step} of {STEPS.length}
-            </p>
-            <button
-              type="button"
-              onClick={() => {
-                logout()
-                navigate('/login')
-              }}
-              className="rounded-full border border-slate-200 px-3 py-1.5 text-[12px] font-semibold text-slate-600 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600"
-            >
-              Sign out
-            </button>
-          </div>
-        </div>
-        <p className="mb-4 text-sm text-ink-muted sm:hidden">
-          Step {step} of {STEPS.length}
-        </p>
+    <div className="relative flex min-h-dvh flex-col overflow-x-hidden bg-[#fcfdff]">
+      <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute -left-24 -top-20 h-72 w-72 rounded-full bg-[#e8f1ff] blur-[60px]" />
+        <div className="absolute -right-20 bottom-10 h-64 w-64 rounded-full bg-[#eef5ff] blur-[50px]" />
+      </div>
 
-        <div className="mb-8 flex gap-2 overflow-x-auto pb-1">
-          {STEPS.map((s) => (
-            <div
-              key={s.id}
-              className={cn(
-                'flex min-w-[88px] flex-1 flex-col gap-1.5',
-                s.id > step && 'opacity-40',
-              )}
-            >
-              <div
-                className={cn(
-                  'h-1.5 rounded-full',
-                  s.id <= step ? 'bg-brand-600' : 'bg-slate-200',
-                )}
-              />
-              <span className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
-                {String(s.id).padStart(2, '0')} {s.label}
-              </span>
-            </div>
-          ))}
+      <div className="relative z-10 mx-auto flex w-full max-w-[440px] flex-1 flex-col px-5 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-[calc(env(safe-area-inset-top)+0.75rem)]">
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            aria-label="Back"
+            onClick={goBack}
+            className="flex h-10 w-10 items-center justify-center rounded-full text-[#0f1a33] hover:bg-slate-100"
+          >
+            <ArrowLeft className="h-5 w-5" strokeWidth={2.2} />
+          </button>
+          <ProgressBar step={step} />
+          <button
+            type="button"
+            onClick={skip}
+            className="shrink-0 rounded-full px-2 py-1.5 text-[12.5px] font-semibold text-slate-500 hover:text-[#0064f0]"
+          >
+            Skip for now
+          </button>
         </div>
 
-        <Card className="!p-0 overflow-hidden shadow-soft">
-          <div className="border-b border-surface-border px-5 py-4 md:px-7">
-            <h1 className="font-display text-xl font-bold text-ink md:text-2xl">
-              {step === 1 && 'Tell us about your business'}
-              {step === 2 && 'What kind of shop is this?'}
-              {step === 3 && 'Shop details'}
-              {step === 4 && 'Invite your team'}
-              {step === 5 && 'Your shop is ready!'}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={step}
+            initial={{ opacity: 0, x: 16 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -12 }}
+            transition={{ duration: 0.22 }}
+            className="mt-6 flex flex-1 flex-col"
+          >
+            <h1 className="font-display text-[26px] font-extrabold tracking-[-0.03em] text-[#0f1a33]">
+              {STEP_META[step - 1].title}
             </h1>
-            <p className="mt-1 text-sm text-ink-muted">
-              {step === 1 && 'We’ll use this on receipts and your dashboard.'}
-              {step === 2 && 'Pick a category so we can set smart defaults.'}
-              {step === 3 && 'Customers and workers will see these details.'}
-              {step === 4 && 'You can always invite more people later.'}
-              {step === 5 && 'Review and jump into your Paylo dashboard.'}
+            <p className="mt-2 text-[14px] leading-relaxed text-slate-500">
+              {STEP_META[step - 1].subtitle}
             </p>
-          </div>
 
-          <div className="px-5 py-6 md:px-7">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={step}
-                initial={{ opacity: 0, x: 12 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -12 }}
-                transition={{ duration: 0.2 }}
-              >
-                {step === 1 && (
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <Field label="Shop name">
-                      <Input
-                        placeholder="e.g. Main Salon"
-                        value={shopName}
-                        onChange={(e) => setShopName(e.target.value)}
-                        autoFocus
+            <div className="mt-6 flex-1 space-y-3.5">
+              {step === 1 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => fileRef.current?.click()}
+                    className="flex w-full flex-col items-center justify-center rounded-[22px] border border-dashed border-slate-300 bg-[#f4f7fb] px-4 py-8 text-center transition hover:border-[#0064f0]/50 hover:bg-[#eef5ff]"
+                  >
+                    {logoPreview ? (
+                      <img
+                        src={logoPreview}
+                        alt="Shop logo preview"
+                        className="h-20 w-20 rounded-2xl object-cover shadow-sm"
                       />
-                    </Field>
-                    <Field label="Owner name">
-                      <Input
-                        placeholder="Your full name"
-                        value={ownerName}
-                        onChange={(e) => setOwnerName(e.target.value)}
-                      />
-                    </Field>
+                    ) : (
+                      <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-[#0064f0] shadow-sm">
+                        <Camera className="h-6 w-6" strokeWidth={2} />
+                      </span>
+                    )}
+                    <span className="mt-3 text-[14px] font-semibold text-[#0f1a33]">
+                      {logoPreview ? 'Change Shop Logo' : 'Add Shop Logo'}
+                    </span>
+                    <span className="mt-1 text-[12px] text-slate-400">PNG, JPG (Max 2MB)</span>
+                  </button>
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/jpg,image/webp"
+                    className="hidden"
+                    onChange={(e) => onLogoPick(e.target.files?.[0] ?? null)}
+                  />
+
+                  <FieldShell icon={<Store className="h-[18px] w-[18px]" />} label="Shop Name">
+                    <input
+                      value={shopName}
+                      onChange={(e) => setShopName(e.target.value)}
+                      placeholder="Enter your shop name"
+                      className="w-full bg-transparent text-[14px] outline-none placeholder:text-slate-400"
+                    />
+                  </FieldShell>
+
+                  <FieldShell
+                    icon={<Grid2X2 className="h-[18px] w-[18px]" />}
+                    label="Business Type"
+                  >
+                    <select
+                      value={businessType}
+                      onChange={(e) => setBusinessType(e.target.value)}
+                      className="w-full bg-transparent text-[14px] outline-none"
+                    >
+                      <option value="">Select business type</option>
+                      {BUSINESS_TYPES.map((t) => (
+                        <option key={t} value={t}>
+                          {t}
+                        </option>
+                      ))}
+                    </select>
+                  </FieldShell>
+                </>
+              )}
+
+              {step === 2 && (
+                <>
+                  <FieldShell icon={<MapPin className="h-[18px] w-[18px]" />} label="Address">
+                    <input
+                      value={address}
+                      onChange={(e) => setAddress(e.target.value)}
+                      placeholder="Enter your shop address"
+                      className="w-full bg-transparent text-[14px] outline-none placeholder:text-slate-400"
+                    />
+                  </FieldShell>
+                  <FieldShell icon={<Building2 className="h-[18px] w-[18px]" />} label="City">
+                    <input
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
+                      placeholder="Enter city"
+                      className="w-full bg-transparent text-[14px] outline-none placeholder:text-slate-400"
+                    />
+                  </FieldShell>
+                  <FieldShell icon={<BookOpen className="h-[18px] w-[18px]" />} label="State">
+                    <select
+                      value={stateName}
+                      onChange={(e) => setStateName(e.target.value)}
+                      className="w-full bg-transparent text-[14px] outline-none"
+                    >
+                      <option value="">Select state</option>
+                      {INDIAN_STATES.map((s) => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))}
+                    </select>
+                  </FieldShell>
+                  <FieldShell icon={<ScanLine className="h-[18px] w-[18px]" />} label="PIN Code">
+                    <input
+                      value={pinCode}
+                      onChange={(e) => setPinCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      placeholder="Enter PIN code"
+                      inputMode="numeric"
+                      className="w-full bg-transparent text-[14px] outline-none placeholder:text-slate-400"
+                    />
+                  </FieldShell>
+                </>
+              )}
+
+              {step === 3 && (
+                <>
+                  <FieldShell
+                    icon={<Phone className="h-[18px] w-[18px]" />}
+                    label="Contact Number"
+                  >
+                    <input
+                      value={contactNumber}
+                      onChange={(e) => setContactNumber(e.target.value)}
+                      placeholder="Enter phone number"
+                      inputMode="tel"
+                      className="w-full bg-transparent text-[14px] outline-none placeholder:text-slate-400"
+                    />
+                  </FieldShell>
+                  <FieldShell
+                    icon={<Phone className="h-[18px] w-[18px]" />}
+                    label="Alternate Number (Optional)"
+                  >
+                    <input
+                      value={alternateNumber}
+                      onChange={(e) => setAlternateNumber(e.target.value)}
+                      placeholder="Enter alternate number"
+                      inputMode="tel"
+                      className="w-full bg-transparent text-[14px] outline-none placeholder:text-slate-400"
+                    />
+                  </FieldShell>
+                  <FieldShell
+                    icon={
+                      <span className="flex h-[18px] w-[18px] items-center justify-center rounded-[4px] bg-[#25D366] text-[10px] font-bold text-white">
+                        W
+                      </span>
+                    }
+                    label="WhatsApp Number (Optional)"
+                  >
+                    <input
+                      value={whatsappNumber}
+                      onChange={(e) => setWhatsappNumber(e.target.value)}
+                      placeholder="Enter WhatsApp number"
+                      inputMode="tel"
+                      className="w-full bg-transparent text-[14px] outline-none placeholder:text-slate-400"
+                    />
+                  </FieldShell>
+                </>
+              )}
+
+              {step === 4 && (
+                <>
+                  <div className="flex h-12 items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3.5">
+                    <Search className="h-[18px] w-[18px] text-slate-400" />
+                    <input
+                      value={categoryQuery}
+                      onChange={(e) => setCategoryQuery(e.target.value)}
+                      placeholder="Search categories"
+                      className="w-full bg-transparent text-[14px] outline-none placeholder:text-slate-400"
+                    />
                   </div>
-                )}
-
-                {step === 2 && (
-                  <div className="space-y-4">
-                    <div className="relative">
-                      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-faint" />
-                      <Input
-                        className="pl-9"
-                        placeholder="Search categories…"
-                        value={categoryQuery}
-                        onChange={(e) => setCategoryQuery(e.target.value)}
-                      />
-                    </div>
-
-                    {CATEGORY_GROUPS.map((group) => {
-                      const items = filteredCategories.filter((c) => c.group === group)
-                      if (items.length === 0) return null
+                  <div className="grid grid-cols-3 gap-2.5">
+                    {filteredCategories.map((cat) => {
+                      const Icon = CATEGORY_ICONS[cat.icon] ?? LayoutGrid
+                      const active = categoryId === cat.id
                       return (
-                        <div key={group}>
-                          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-faint">
-                            {group}
-                          </p>
-                          <div className="grid gap-2 sm:grid-cols-2">
-                            {items.map((c) => (
-                              <button
-                                key={c.id}
-                                type="button"
-                                onClick={() => {
-                                  setShowCustom(false)
-                                  setCategoryId(c.id)
-                                  setCategoryName(c.name)
-                                }}
-                                className={cn(
-                                  'rounded-btn border px-3 py-3 text-left transition',
-                                  categoryId === c.id && !showCustom
-                                    ? 'border-brand-500 bg-brand-50 ring-2 ring-brand-500/20'
-                                    : 'border-surface-border bg-white hover:border-brand-200',
-                                )}
-                              >
-                                <p className="text-sm font-semibold text-ink">{c.name}</p>
-                                <p className="mt-0.5 text-xs text-ink-muted">{c.description}</p>
-                              </button>
-                            ))}
-                          </div>
-                        </div>
+                        <button
+                          key={cat.id}
+                          type="button"
+                          onClick={() => setCategoryId(cat.id)}
+                          className={cn(
+                            'flex min-h-[108px] flex-col items-center justify-center gap-2 rounded-[18px] border bg-white px-2 py-3 text-center transition',
+                            active
+                              ? 'border-[#0064f0] shadow-[0_8px_24px_rgba(0,100,240,0.14)]'
+                              : 'border-slate-200 hover:border-slate-300',
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              'flex h-10 w-10 items-center justify-center rounded-xl',
+                              active ? 'bg-[#e7f0ff] text-[#0064f0]' : 'bg-slate-50 text-slate-500',
+                            )}
+                          >
+                            <Icon className="h-5 w-5" strokeWidth={2.1} />
+                          </span>
+                          <span
+                            className={cn(
+                              'text-[11.5px] font-semibold leading-tight',
+                              active ? 'text-[#0064f0]' : 'text-slate-600',
+                            )}
+                          >
+                            {cat.name}
+                          </span>
+                        </button>
                       )
                     })}
-
-                    <div className="rounded-btn border border-dashed border-surface-border p-4">
-                      {!showCustom ? (
-                        <Button
-                          variant="ghost"
-                          className="w-full"
-                          onClick={() => {
-                            setShowCustom(true)
-                            setCategoryId('custom')
-                          }}
-                        >
-                          <Plus className="h-4 w-4" />
-                          Add Custom Category
-                        </Button>
-                      ) : (
-                        <Field label="Custom category name">
-                          <Input
-                            placeholder="e.g. Pet Grooming"
-                            value={customCategory}
-                            onChange={(e) => {
-                              setCustomCategory(e.target.value)
-                              setCategoryName(e.target.value)
-                            }}
-                            autoFocus
-                          />
-                        </Field>
-                      )}
-                    </div>
                   </div>
-                )}
+                </>
+              )}
+            </div>
+          </motion.div>
+        </AnimatePresence>
 
-                {step === 3 && (
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <Field label="Phone">
-                      <Input
-                        placeholder="+91 9XXXX XXXXX"
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
-                      />
-                    </Field>
-                    <Field label="Email">
-                      <Input
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                      />
-                    </Field>
-                    <div className="sm:col-span-2">
-                      <Field label="Address">
-                        <Input
-                          placeholder="Street, landmark"
-                          value={address}
-                          onChange={(e) => setAddress(e.target.value)}
-                        />
-                      </Field>
-                    </div>
-                    <Field label="City">
-                      <Input value={city} onChange={(e) => setCity(e.target.value)} />
-                    </Field>
-                    <Field label="State">
-                      <Input value={state} onChange={(e) => setState(e.target.value)} />
-                    </Field>
-                    <Field label="PIN code">
-                      <Input value={pinCode} onChange={(e) => setPinCode(e.target.value)} />
-                    </Field>
-                    <div className="grid grid-cols-2 gap-3">
-                      <Field label="Opens">
-                        <Input
-                          type="time"
-                          value={openHour}
-                          onChange={(e) => setOpenHour(e.target.value)}
-                        />
-                      </Field>
-                      <Field label="Closes">
-                        <Input
-                          type="time"
-                          value={closeHour}
-                          onChange={(e) => setCloseHour(e.target.value)}
-                        />
-                      </Field>
-                    </div>
-                    <div className="sm:col-span-2">
-                      <Field label="Description" hint="Optional">
-                        <Textarea
-                          placeholder="What makes your shop special?"
-                          value={description}
-                          onChange={(e) => setDescription(e.target.value)}
-                        />
-                      </Field>
-                    </div>
-                  </div>
-                )}
+        {error && (
+          <p className="mt-3 text-center text-[12.5px] leading-relaxed text-red-600">{error}</p>
+        )}
 
-                {step === 4 && (
-                  <div className="space-y-5">
-                    {workers.length > 0 && (
-                      <div className="space-y-2">
-                        {workers.map((w) => (
-                          <div
-                            key={w.key}
-                            className="flex items-center justify-between rounded-btn border border-surface-border bg-slate-50 px-3 py-3"
-                          >
-                            <div>
-                              <p className="text-sm font-semibold text-ink">{w.name}</p>
-                              <p className="text-xs text-ink-muted">
-                                {[w.phone, w.email].filter(Boolean).join(' · ') || 'No contact yet'}
-                              </p>
-                            </div>
-                            <button
-                              type="button"
-                              className="text-ink-faint hover:text-red-600"
-                              onClick={() =>
-                                setWorkers((prev) => prev.filter((x) => x.key !== w.key))
-                              }
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    <div className="rounded-card border border-surface-border p-4">
-                      <div className="mb-3 flex items-center gap-2">
-                        <UserPlus className="h-4 w-4 text-brand-700" />
-                        <p className="text-sm font-semibold text-ink">Invite a worker</p>
-                      </div>
-                      <div className="grid gap-3 sm:grid-cols-3">
-                        <Field label="Name">
-                          <Input
-                            value={inviteName}
-                            onChange={(e) => setInviteName(e.target.value)}
-                            placeholder="Worker name"
-                          />
-                        </Field>
-                        <Field label="Phone">
-                          <Input
-                            value={invitePhone}
-                            onChange={(e) => setInvitePhone(e.target.value)}
-                            placeholder="Phone"
-                          />
-                        </Field>
-                        <Field label="Email">
-                          <Input
-                            value={inviteEmail}
-                            onChange={(e) => setInviteEmail(e.target.value)}
-                            placeholder="Email"
-                          />
-                        </Field>
-                      </div>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <Button type="button" variant="secondary" onClick={addInvite}>
-                          Add to team
-                        </Button>
-                        <Button type="button" variant="ghost" onClick={() => setStep(5)}>
-                          Skip for now
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {step === 5 && (
-                  <div className="space-y-4">
-                    <div className="rounded-card bg-brand-50/70 p-5">
-                      <p className="font-display text-lg font-bold text-brand-900">
-                        {shopName || 'Your shop'} is ready!
-                      </p>
-                      <p className="mt-1 text-sm text-brand-800/80">
-                        {categoryName || 'Custom'} · {city || 'India'}
-                      </p>
-                    </div>
-                    <ul className="space-y-2">
-                      {[
-                        'Shop profile created',
-                        'Default services seeded',
-                        workers.length
-                          ? `${workers.length} team member${workers.length > 1 ? 's' : ''} invited`
-                          : 'You can invite workers anytime',
-                        'Dashboard unlocked',
-                      ].map((item) => (
-                        <li
-                          key={item}
-                          className="flex items-center gap-2 text-sm text-ink-soft"
-                        >
-                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#eef5ff] text-[#0064f0]">
-                            <Check className="h-3 w-3" strokeWidth={3} />
-                          </span>
-                          {item}
-                        </li>
-                      ))}
-                    </ul>
-                    <Label htmlFor="hours-note">Business hours</Label>
-                    <Select id="hours-note" disabled value="hours">
-                      <option value="hours">
-                        Open {openHour} – {closeHour}
-                      </option>
-                    </Select>
-                  </div>
-                )}
-              </motion.div>
-            </AnimatePresence>
-          </div>
-
-          <div className="flex items-center justify-between border-t border-surface-border px-5 py-4 md:px-7">
-            <Button
-              variant="ghost"
-              disabled={step === 1 || saving}
-              onClick={() => setStep((s) => Math.max(1, s - 1))}
-            >
-              <ChevronLeft className="h-4 w-4" />
-              Back
-            </Button>
-            {step < 5 ? (
-              <Button
-                disabled={!canNext()}
-                onClick={() => setStep((s) => Math.min(5, s + 1))}
-              >
-                Continue
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            ) : (
-              <Button loading={saving} onClick={() => void finish()}>
-                Go to Dashboard
-              </Button>
-            )}
-          </div>
-        </Card>
+        <div className="mt-4 space-y-3">
+          <Button
+            className="h-12 w-full justify-center gap-2 rounded-2xl bg-[#0064f0] text-[15px] font-semibold shadow-[0_12px_28px_rgba(0,100,240,0.28)]"
+            loading={saving}
+            onClick={goNext}
+          >
+            {step === 4 ? 'Complete Setup' : 'Next'}
+            <ArrowRight className="h-4 w-4" />
+          </Button>
+          <p className="text-center text-[12px] text-slate-400">You can always edit this later.</p>
+          {session?.user.email && (
+            <p className="text-center text-[11px] text-slate-300">
+              Saving for {session.user.email}
+            </p>
+          )}
+        </div>
       </div>
     </div>
   )
