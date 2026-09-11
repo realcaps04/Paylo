@@ -3,10 +3,10 @@ import {
   Bell,
   Briefcase,
   ChartColumn,
+  ChevronDown,
   CreditCard,
   Home,
   LayoutDashboard,
-  MoreHorizontal,
   Plus,
   Search,
   Settings,
@@ -52,10 +52,10 @@ function workerNav() {
 function mobileOwnerNav() {
   return [
     { to: '/app', label: 'Home', icon: Home, end: true },
-    { to: '/app/work', label: 'Work', icon: Briefcase },
-    { to: '/app/work/new', label: 'Add', icon: Plus, primary: true },
-    { to: '/app/transactions', label: 'Txns', icon: ClipboardList },
-    { to: '/app/more', label: 'More', icon: MoreHorizontal },
+    { to: '/app/services', label: 'Services', icon: Package },
+    { to: '/app/transactions', label: 'Sales', icon: ChartColumn },
+    { to: '/app/workers', label: 'Staffs', icon: Users },
+    { to: '/app/settings', label: 'Settings', icon: Settings },
   ]
 }
 
@@ -241,16 +241,22 @@ export function AppShell({ children }: { children: ReactNode }) {
               <button
                 type="button"
                 onClick={() => navigate('/app/settings')}
-                className="flex items-center gap-2 rounded-btn border border-surface-border bg-white px-2 py-1.5 hover:bg-slate-50"
+                className="flex items-center gap-2 rounded-full border border-surface-border bg-white py-1 pl-1 pr-2.5 hover:bg-slate-50 sm:pr-3"
               >
                 <Avatar
                   name={session?.user.name ?? 'U'}
                   picture={session?.user.picture}
                   size="sm"
                 />
-                <span className="hidden text-sm font-medium text-ink md:inline">
-                  {session?.user.name?.split(' ')[0]}
+                <span className="hidden text-left sm:block">
+                  <span className="block text-[13px] font-semibold leading-tight text-ink">
+                    {session?.user.name ?? 'Account'}
+                  </span>
+                  <span className="block text-[11px] capitalize leading-tight text-ink-faint">
+                    {session?.role ?? 'owner'}
+                  </span>
                 </span>
+                <ChevronDown className="hidden h-3.5 w-3.5 text-ink-faint sm:block" />
               </button>
             </div>
           </header>

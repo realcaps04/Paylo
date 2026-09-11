@@ -587,12 +587,43 @@ export function OnboardingWizard() {
                   >
                     <input
                       value={contactNumber}
-                      onChange={(e) => setContactNumber(e.target.value)}
+                      onChange={(e) => {
+                        const next = e.target.value
+                        setContactNumber(next)
+                        if (whatsappSameAsContact) setWhatsappNumber(next)
+                      }}
                       placeholder="Enter phone number"
                       inputMode="tel"
                       className="w-full bg-transparent text-[14px] font-medium text-[#0f1a33] outline-none placeholder:font-normal placeholder:text-slate-400"
                     />
                   </FieldShell>
+
+                  <label className="flex cursor-pointer items-center gap-3 rounded-[16px] border border-[#d9ecdf] bg-[#f3fbf6] px-3.5 py-3">
+                    <span
+                      className={cn(
+                        'flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition',
+                        whatsappSameAsContact
+                          ? 'border-[#25D366] bg-[#25D366] text-white'
+                          : 'border-slate-300 bg-white',
+                      )}
+                    >
+                      {whatsappSameAsContact && <Check className="h-3 w-3" strokeWidth={3} />}
+                    </span>
+                    <input
+                      type="checkbox"
+                      className="sr-only"
+                      checked={whatsappSameAsContact}
+                      onChange={(e) => {
+                        const checked = e.target.checked
+                        setWhatsappSameAsContact(checked)
+                        if (checked) setWhatsappNumber(contactNumber)
+                      }}
+                    />
+                    <span className="text-[13px] font-medium leading-snug text-[#0f1a33]">
+                      WhatsApp number is the same as contact number
+                    </span>
+                  </label>
+
                   <FieldShell
                     icon={<Phone className="h-[18px] w-[18px]" />}
                     label="Alternate Number"
@@ -617,10 +648,14 @@ export function OnboardingWizard() {
                   >
                     <input
                       value={whatsappNumber}
-                      onChange={(e) => setWhatsappNumber(e.target.value)}
+                      onChange={(e) => {
+                        setWhatsappSameAsContact(false)
+                        setWhatsappNumber(e.target.value)
+                      }}
                       placeholder="Enter WhatsApp number"
                       inputMode="tel"
-                      className="w-full bg-transparent text-[14px] font-medium text-[#0f1a33] outline-none placeholder:font-normal placeholder:text-slate-400"
+                      disabled={whatsappSameAsContact}
+                      className="w-full bg-transparent text-[14px] font-medium text-[#0f1a33] outline-none placeholder:font-normal placeholder:text-slate-400 disabled:text-slate-500"
                     />
                   </FieldShell>
                 </>
