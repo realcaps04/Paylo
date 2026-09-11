@@ -222,11 +222,11 @@ export function LoginPage() {
         >
           <LogoMark
             size="xl"
-            className="h-[76px] w-[76px] rounded-[20px] shadow-[0_12px_40px_rgba(0,0,0,0.18)]"
+            className="h-[92px] w-[92px] drop-shadow-[0_12px_32px_rgba(0,0,0,0.22)]"
           />
           <h1 className="mt-4 font-display text-[34px] font-extrabold tracking-tight">Paylo</h1>
           <p className="mt-2 text-[15px] font-medium text-white/85">
-            Manage Your Shop, Effortlessly
+            Work Today. Grow Tomorrow.
           </p>
           <h2 className="mt-5 max-w-[280px] font-display text-[26px] font-bold leading-[1.2] tracking-tight sm:text-[28px]">
             Simple Tools for a <span className="text-[#9ec5ff]">Smarter Business</span>
@@ -396,7 +396,7 @@ export function LoginPage() {
           </Button>
 
           <p className="mt-8 text-center text-[12px] text-slate-400">
-            Shops grow better with Paylo
+            Work Today. Grow Tomorrow.
           </p>
 
           <div className="mt-3 flex justify-center gap-3 text-[11px] text-slate-300">

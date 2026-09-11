@@ -376,9 +376,19 @@ export function LogoMark({
         size === 'sm' && 'h-8 w-8',
         size === 'md' && 'h-10 w-10',
         size === 'lg' && 'h-14 w-14',
-        size === 'xl' && 'h-20 w-20',
+        size === 'xl' && 'h-[88px] w-[88px]',
         className,
       )}
+    />
+  )
+}
+
+export function LogoLockup({ className }: { className?: string }) {
+  return (
+    <img
+      src="/paylo-lockup.png"
+      alt="Paylo — Work Today. Grow Tomorrow."
+      className={cn('mx-auto h-auto w-full max-w-[200px] object-contain', className)}
     />
   )
 }
@@ -394,7 +404,7 @@ export function Logo({
 }) {
   return (
     <div className="flex items-center gap-2.5">
-      <LogoMark size={size} className="drop-shadow-sm" />
+      <LogoMark size={size} />
       {showWordmark && (
         <div>
           <div
@@ -410,7 +420,7 @@ export function Logo({
           </div>
           {size === 'lg' && (
             <p className={cn('text-xs', inverted ? 'text-white/75' : 'text-ink-muted')}>
-              Simple payments. Smarter shop management.
+              Work Today. Grow Tomorrow.
             </p>
           )}
         </div>

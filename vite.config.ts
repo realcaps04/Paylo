@@ -15,6 +15,7 @@ export default defineConfig({
         'favicon.svg',
         'favicon.png',
         'paylo_applogo.png',
+        'paylo-lockup.png',
         'apple-touch-icon.png',
         'offline.html',
         'google-callback.html',
