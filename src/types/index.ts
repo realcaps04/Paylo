@@ -61,6 +61,8 @@ export interface Worker {
   avatar?: string
   active: boolean
   inviteStatus: 'joined' | 'pending' | 'none'
+  /** 8-char alphanumeric code staff use to join / log in */
+  inviteCode?: string
 }
 
 export interface Customer {

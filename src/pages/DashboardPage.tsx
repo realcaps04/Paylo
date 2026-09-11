@@ -1,12 +1,10 @@
-import { useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useMemo } from 'react'
+import { Link } from 'react-router-dom'
 import {
   ArrowUpRight,
   BarChart3,
-  ChevronDown,
   ChevronRight,
   Plus,
-  Store,
   UserPlus,
   Users,
   Wallet,
@@ -47,12 +45,8 @@ function statusLabel(status: string) {
 }
 
 function OwnerDashboard() {
-  const { session, setActiveShop } = useAuth()
-  const { shop, store, workRecords, workers, customers, services } = useShop()
-  const navigate = useNavigate()
-  const [shopOpen, setShopOpen] = useState(false)
-
-  const shops = store.shops.filter((s) => session?.shopIds.includes(s.id))
+  const { session } = useAuth()
+  const { workRecords, workers, customers, services } = useShop()
 
   const todayRecords = useMemo(
     () => filterByDateRange(workRecords, 'today'),
@@ -68,7 +62,15 @@ function OwnerDashboard() {
   const salesDelta = pctChange(todaySales, yesterdaySales)
 
   const totalCustomers = customers.length
-  const shopStaff = workers.filter((w) => w.active && w.role !== 'owner').length
+  const shopStaff = workers.filter((w) => {
+    if (!w.active || w.role === 'owner') return false
+    // Owner account must never count as staff
+    if (session?.user.id && w.userId === session.user.id) return false
+    if (session?.user.email && w.email?.toLowerCase() === session.user.email.toLowerCase()) {
+      return false
+    }
+    return true
+  }).length
   const totalServices = services.filter((s) => s.active).length
 
   const recent = useMemo(
@@ -90,56 +92,6 @@ function OwnerDashboard() {
 
   return (
     <div className="space-y-5 pb-2">
-      {shops.length > 0 && (
-        <div className="flex justify-end">
-          <div className="relative shrink-0">
-            <button
-              type="button"
-              onClick={() => setShopOpen((v) => !v)}
-              className="flex max-w-[11rem] items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-left shadow-sm"
-            >
-              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#eef5ff] text-[#0064f0]">
-                <Store className="h-3.5 w-3.5" />
-              </span>
-              <span className="truncate text-xs font-semibold text-[#0f1a33]">
-                {shop?.name ?? 'Select shop'}
-              </span>
-              <ChevronDown className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-            </button>
-            {shopOpen && (
-              <div className="absolute right-0 top-full z-40 mt-1 w-56 rounded-2xl border border-slate-200 bg-white p-1 shadow-lg">
-                {shops.map((s) => (
-                  <button
-                    key={s.id}
-                    type="button"
-                    className={cn(
-                      'flex w-full rounded-xl px-3 py-2.5 text-left text-sm hover:bg-slate-50',
-                      s.id === shop?.id && 'bg-[#eef5ff] font-semibold text-[#0064f0]',
-                    )}
-                    onClick={() => {
-                      setActiveShop(s.id)
-                      setShopOpen(false)
-                    }}
-                  >
-                    {s.name}
-                  </button>
-                ))}
-                <button
-                  type="button"
-                  className="mt-1 flex w-full rounded-xl px-3 py-2.5 text-left text-sm font-medium text-[#0064f0] hover:bg-[#eef5ff]"
-                  onClick={() => {
-                    setShopOpen(false)
-                    navigate('/onboarding')
-                  }}
-                >
-                  + Add Another Shop
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3">
         <div className="relative col-span-2 overflow-hidden rounded-[22px] bg-gradient-to-br from-[#1a7bff] via-[#0064f0] to-[#0047b8] p-4 text-white shadow-lg shadow-[#0064f0]/25">
@@ -214,7 +166,7 @@ function OwnerDashboard() {
       </div>
 
       {/* Quick actions */}
-      <div className="flex justify-start">
+      <div className="flex justify-end">
         {quickActions.map((a) => (
           <Link key={a.to} to={a.to} className="flex flex-col items-center gap-2 py-1">
             <span

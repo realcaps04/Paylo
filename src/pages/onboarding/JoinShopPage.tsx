@@ -7,6 +7,11 @@ import { useAuth } from '@/context/AuthContext'
 import { useShop } from '@/context/ShopContext'
 import { useToast } from '@/context/ToastContext'
 import { cn } from '@/lib/cn'
+import { normalizeInviteCode } from '@/lib/inviteCode'
+import { convexHttp, convexReady } from '@/lib/convex'
+import { api } from '../../../convex/_generated/api'
+import { mergeCloudShopIntoStore } from '@/lib/restoreSession'
+import { uid } from '@/lib/format'
 
 function ProgressDots({ active }: { active: number }) {
   return (
@@ -27,7 +32,7 @@ function ProgressDots({ active }: { active: number }) {
 export function JoinShopPage() {
   const navigate = useNavigate()
   const { session, attachShop, clearRoleChoice } = useAuth()
-  const { store, addWorker, seedDemo } = useShop()
+  const { store, addWorker, addShop, updateWorker } = useShop()
   const { toast } = useToast()
   const [code, setCode] = useState('')
   const [busy, setBusy] = useState(false)
@@ -35,80 +40,129 @@ export function JoinShopPage() {
 
   const join = async () => {
     setError(null)
-    const trimmed = code.trim().toLowerCase()
-    if (!trimmed) {
-      setError('Enter the invite code from your shop owner.')
+    const trimmed = normalizeInviteCode(code)
+    if (trimmed.length !== 8) {
+      setError('Enter the 8-character invite code from your shop owner.')
       return
     }
 
     setBusy(true)
-    await new Promise((r) => setTimeout(r, 200))
+    await new Promise((r) => setTimeout(r, 150))
 
-    let shops = store.shops
-    if (!shops.length) {
-      seedDemo()
-      // seedDemo updates store asynchronously via setState; also check after microtask
-      await new Promise((r) => setTimeout(r, 50))
-      shops = store.shops.length ? store.shops : shops
-    }
-
-    // Prefer current store; if still empty after seed, match known demo ids
-    const list = store.shops.length ? store.shops : shops
-    const shop =
-      list.find((s) => s.id.toLowerCase() === trimmed) ||
-      list.find((s) => s.id.toLowerCase().endsWith(trimmed)) ||
-      list.find((s) =>
-        s.name
-          .toLowerCase()
-          .replace(/\s+/g, '-')
-          .includes(trimmed.replace(/\s+/g, '-')),
+    try {
+      // 1) Same-device / local store first
+      const localInvite = store.workers.find(
+        (w) =>
+          w.inviteCode &&
+          normalizeInviteCode(w.inviteCode) === trimmed &&
+          w.role !== 'owner' &&
+          w.active,
       )
 
-    // Fallback for demo codes when store just seeded in same tick
-    if (!shop && (trimmed === 'shop_main' || trimmed === 'main-salon' || trimmed === 'main salon')) {
-      seedDemo()
-      const worker = addWorker({
-        shopId: 'shop_main',
-        userId: session?.user.id,
-        name: session?.user.name ?? 'Staff',
-        role: 'worker',
-        phone: session?.user.phone ?? '',
-        email: session?.user.email ?? '',
-        employeeId: `EMP-${Math.floor(1000 + Math.random() * 9000)}`,
-        joiningDate: new Date().toISOString().slice(0, 10),
-        active: true,
-        inviteStatus: 'joined',
-      })
-      attachShop('shop_main', 'worker', worker.id)
-      toast('Joined Main Salon')
+      if (localInvite) {
+        const shop = store.shops.find((s) => s.id === localInvite.shopId)
+        if (!shop) {
+          setError('This invite is no longer linked to a shop.')
+          setBusy(false)
+          return
+        }
+        updateWorker(localInvite.id, {
+          userId: session?.user.id,
+          name: session?.user.name || localInvite.name,
+          email: session?.user.email || localInvite.email,
+          phone: session?.user.phone || localInvite.phone,
+          inviteStatus: 'joined',
+        })
+        attachShop(
+          shop.id,
+          localInvite.role === 'manager' ? 'manager' : 'worker',
+          localInvite.id,
+        )
+        toast(`Joined ${shop.name}`)
+        setBusy(false)
+        navigate('/app')
+        return
+      }
+
+      // 2) Cloud invite (other devices)
+      if (convexReady && convexHttp && session?.user.email) {
+        const claimed = await convexHttp.mutation(api.staffInvites.claim, {
+          code: trimmed,
+          staffEmail: session.user.email,
+          staffName: session.user.name,
+        })
+
+        const shopId = claimed.shop ? String(claimed.shop._id) : claimed.shopId
+        const shopName = claimed.shop?.shopName ?? claimed.shopName
+
+        if (claimed.shop) {
+          mergeCloudShopIntoStore(claimed.shop as Parameters<typeof mergeCloudShopIntoStore>[0], {
+            id: session.user.id,
+            name: claimed.shop.shopName,
+            email: claimed.ownerEmail,
+          })
+        } else if (!store.shops.some((s) => s.id === shopId)) {
+          addShop({
+            id: shopId,
+            name: shopName,
+            categoryId: 'general',
+            categoryName: 'Shop',
+            ownerName: 'Owner',
+            phone: '',
+            email: claimed.ownerEmail,
+            address: '',
+            city: '',
+            state: '',
+            pinCode: '',
+            description: shopName,
+            hours: { open: '09:00', close: '20:00', holidays: [] },
+            createdAt: new Date().toISOString(),
+          })
+        }
+
+        const existing = store.workers.find(
+          (w) => w.inviteCode && normalizeInviteCode(w.inviteCode) === trimmed,
+        )
+        const workerId =
+          existing?.id ??
+          addWorker({
+            id: claimed.localWorkerId || uid('w'),
+            shopId,
+            userId: session.user.id,
+            name: session.user.name || claimed.workerName,
+            role: claimed.role,
+            phone: session.user.phone || claimed.workerPhone || '',
+            email: session.user.email || claimed.workerEmail || '',
+            employeeId: `EMP-${Math.floor(1000 + Math.random() * 9000)}`,
+            joiningDate: new Date().toISOString().slice(0, 10),
+            active: true,
+            inviteStatus: 'joined',
+            inviteCode: trimmed,
+          }).id
+
+        if (existing) {
+          updateWorker(existing.id, {
+            userId: session.user.id,
+            inviteStatus: 'joined',
+            name: session.user.name || existing.name,
+            email: session.user.email || existing.email,
+          })
+        }
+
+        attachShop(shopId, claimed.role, workerId)
+        toast(`Joined ${shopName}`)
+        setBusy(false)
+        navigate('/app')
+        return
+      }
+
+      setError('No staff invite found for that code. Ask your owner for a new code.')
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Could not join with that code'
+      setError(message)
+    } finally {
       setBusy(false)
-      navigate('/app')
-      return
     }
-
-    if (!shop) {
-      setBusy(false)
-      setError('No shop found for that code. Ask your owner for the correct invite.')
-      return
-    }
-
-    const worker = addWorker({
-      shopId: shop.id,
-      userId: session?.user.id,
-      name: session?.user.name ?? 'Staff',
-      role: 'worker',
-      phone: session?.user.phone ?? '',
-      email: session?.user.email ?? '',
-      employeeId: `EMP-${Math.floor(1000 + Math.random() * 9000)}`,
-      joiningDate: new Date().toISOString().slice(0, 10),
-      active: true,
-      inviteStatus: 'joined',
-    })
-
-    attachShop(shop.id, 'worker', worker.id)
-    toast(`Joined ${shop.name}`)
-    setBusy(false)
-    navigate('/app')
   }
 
   return (
@@ -143,20 +197,20 @@ export function JoinShopPage() {
             <Store className="h-7 w-7 text-[#e67a2e]" strokeWidth={2.1} />
           </div>
           <h1 className="mt-5 text-center font-display text-[26px] font-extrabold tracking-[-0.03em] text-[#0f1a33]">
-            Join Your Shop
+            Staff Login
           </h1>
           <p className="mx-auto mt-2 max-w-[300px] text-center text-[14px] leading-relaxed text-slate-500">
-            Ask your shop owner for an invite code, then enter it below to start working in
-            Paylo.
+            Enter the 8-character code your shop owner shared with you.
           </p>
 
           <div className="mt-8 rounded-[22px] bg-white p-5 shadow-[0_14px_40px_rgba(18,50,110,0.10)] ring-1 ring-slate-100">
-            <label className="text-[13px] font-semibold text-[#0f1a33]">Invite code</label>
+            <label className="text-[13px] font-semibold text-[#0f1a33]">Staff invite code</label>
             <Input
-              className="mt-2 h-12 rounded-xl"
-              placeholder="e.g. shop_main or Main Salon"
+              className="mt-2 h-12 rounded-xl font-mono text-center text-lg tracking-[0.2em] uppercase"
+              placeholder="AB12CD34"
+              maxLength={8}
               value={code}
-              onChange={(e) => setCode(e.target.value)}
+              onChange={(e) => setCode(normalizeInviteCode(e.target.value).slice(0, 8))}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') void join()
               }}
@@ -164,16 +218,6 @@ export function JoinShopPage() {
             {error && (
               <p className="mt-2 text-[12.5px] leading-relaxed text-red-600">{error}</p>
             )}
-            <p className="mt-3 text-[12px] text-slate-400">
-              Demo tip: try{' '}
-              <button
-                type="button"
-                className="font-semibold text-[#0064f0]"
-                onClick={() => setCode('shop_main')}
-              >
-                shop_main
-              </button>
-            </p>
             <Button
               className="mt-5 h-12 w-full justify-between rounded-full bg-[#0064f0] px-4"
               loading={busy}

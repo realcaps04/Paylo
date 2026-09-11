@@ -34,4 +34,20 @@ export default defineSchema({
   })
     .index('by_owner_email', ['ownerEmail'])
     .index('by_owner_user', ['ownerUserId']),
+
+  staffInvites: defineTable({
+    code: v.string(),
+    shopId: v.string(),
+    shopName: v.string(),
+    ownerEmail: v.string(),
+    workerName: v.string(),
+    workerPhone: v.optional(v.string()),
+    workerEmail: v.optional(v.string()),
+    role: v.union(v.literal('manager'), v.literal('worker')),
+    claimed: v.boolean(),
+    claimedByEmail: v.optional(v.string()),
+    localWorkerId: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index('by_code', ['code']),
 })

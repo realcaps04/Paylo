@@ -9,6 +9,7 @@ import {
   Plus,
   Search,
   Settings,
+  Store,
   Users,
   Wallet,
   ClipboardList,
@@ -51,7 +52,6 @@ function workerNav() {
 function mobileOwnerNav() {
   return [
     { to: '/app', label: 'Home', icon: Home, end: true },
-    { to: '/app/services', label: 'Services', icon: Package },
     { to: '/app/transactions', label: 'Sales', icon: ChartColumn },
     { to: '/app/workers', label: 'Staffs', icon: Users },
     { to: '/app/settings', label: 'Settings', icon: Settings },
@@ -132,51 +132,60 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="flex min-w-0 flex-1 flex-col">
           {/* Header */}
           <header className="sticky top-0 z-30 border-b border-surface-border bg-white/90 backdrop-blur">
-            <div className="flex items-center gap-3 px-4 py-3 md:px-6">
-              <div className="lg:hidden">
+            <div className="relative flex items-center gap-3 px-4 py-3 md:px-6">
+              <div className="z-10 shrink-0 lg:hidden">
                 <Logo size="sm" />
               </div>
+              {/* spacer so desktop sidebar pages keep left balance */}
+              <div className="hidden w-0 shrink-0 lg:block" />
 
               {!isWorker && shops.length > 0 && (
-                <div className="relative hidden sm:block">
-                  <button
-                    type="button"
-                    onClick={() => setShopOpen((v) => !v)}
-                    className="flex items-center gap-2 rounded-btn border border-surface-border bg-white px-3 py-2 text-sm font-semibold text-ink hover:bg-slate-50"
-                  >
-                    {shop?.name ?? 'Select shop'}
-                    <span className="text-ink-faint">▼</span>
-                  </button>
-                  {shopOpen && (
-                    <div className="absolute left-0 top-full z-40 mt-1 w-56 rounded-card border border-surface-border bg-white p-1 shadow-soft">
-                      {shops.map((s) => (
+                <div className="absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2">
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setShopOpen((v) => !v)}
+                      className="flex max-w-[11.5rem] items-center gap-2 rounded-full border border-surface-border bg-white px-3 py-2 text-left shadow-sm hover:bg-slate-50 sm:max-w-[14rem]"
+                    >
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#eef5ff] text-[#0064f0]">
+                        <Store className="h-3.5 w-3.5" />
+                      </span>
+                      <span className="truncate text-xs font-semibold text-[#0f1a33] sm:text-sm">
+                        {shop?.name ?? 'Select shop'}
+                      </span>
+                      <ChevronDown className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                    </button>
+                    {shopOpen && (
+                      <div className="absolute left-1/2 top-full z-40 mt-1 w-56 -translate-x-1/2 rounded-2xl border border-surface-border bg-white p-1 shadow-soft">
+                        {shops.map((s) => (
+                          <button
+                            key={s.id}
+                            type="button"
+                            className={cn(
+                              'flex w-full rounded-xl px-3 py-2.5 text-left text-sm hover:bg-slate-50',
+                              s.id === shop?.id && 'bg-brand-50 font-semibold text-brand-800',
+                            )}
+                            onClick={() => {
+                              setActiveShop(s.id)
+                              setShopOpen(false)
+                            }}
+                          >
+                            {s.name}
+                          </button>
+                        ))}
                         <button
-                          key={s.id}
                           type="button"
-                          className={cn(
-                            'flex w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-50',
-                            s.id === shop?.id && 'bg-brand-50 font-semibold text-brand-800',
-                          )}
+                          className="mt-1 flex w-full rounded-xl px-3 py-2.5 text-left text-sm font-medium text-brand-700 hover:bg-brand-50"
                           onClick={() => {
-                            setActiveShop(s.id)
                             setShopOpen(false)
+                            navigate('/onboarding')
                           }}
                         >
-                          {s.name}
+                          + Add Another Shop
                         </button>
-                      ))}
-                      <button
-                        type="button"
-                        className="mt-1 flex w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-brand-700 hover:bg-brand-50"
-                        onClick={() => {
-                          setShopOpen(false)
-                          navigate('/onboarding')
-                        }}
-                      >
-                        + Add Another Shop
-                      </button>
-                    </div>
-                  )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -198,7 +207,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               <button
                 type="button"
                 onClick={() => navigate('/app/settings')}
-                className="ml-auto flex items-center gap-2 rounded-full border border-surface-border bg-white py-1 pl-1 pr-2.5 hover:bg-slate-50 sm:pr-3 md:ml-0"
+                className="z-10 ml-auto flex shrink-0 items-center gap-2 rounded-full border border-surface-border bg-white py-1 pl-1 pr-2.5 hover:bg-slate-50 sm:pr-3 md:ml-0"
               >
                 <Avatar
                   name={session?.user.name ?? 'U'}
