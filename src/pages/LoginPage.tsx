@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ArrowRight } from 'lucide-react'
@@ -105,11 +105,60 @@ function WorkIcon({ className }: { className?: string }) {
   )
 }
 
-const FEATURE_ICONS = [
-  { icon: TeamIcon, key: 'team' },
-  { icon: PaymentsIcon, key: 'payments' },
-  { icon: WorkIcon, key: 'work' },
+const FEATURE_CARDS = [
+  { icon: TeamIcon, key: 'team', label: 'Manage Team' },
+  { icon: PaymentsIcon, key: 'payments', label: 'Track Payments' },
+  { icon: WorkIcon, key: 'work', label: 'Record Work' },
 ] as const
+
+function cardMotion(offset: number) {
+  if (offset === 0) {
+    return {
+      x: 0,
+      y: -14,
+      scale: 1.08,
+      rotateY: 0,
+      rotateZ: 0,
+      zIndex: 40,
+      opacity: 1,
+      filter: 'blur(0px)',
+    }
+  }
+  if (offset === -1) {
+    return {
+      x: -102,
+      y: 10,
+      scale: 0.86,
+      rotateY: 32,
+      rotateZ: -4,
+      zIndex: 20,
+      opacity: 0.96,
+      filter: 'blur(0px)',
+    }
+  }
+  if (offset === 1) {
+    return {
+      x: 102,
+      y: 10,
+      scale: 0.86,
+      rotateY: -32,
+      rotateZ: 4,
+      zIndex: 20,
+      opacity: 0.96,
+      filter: 'blur(0px)',
+    }
+  }
+  return {
+    x: offset * 120,
+    y: 24,
+    scale: 0.72,
+    rotateY: offset < 0 ? 40 : -40,
+    rotateZ: 0,
+    zIndex: 10,
+    opacity: 0,
+    filter: 'blur(2px)',
+  }
+}
 
 
 export function LoginPage() {
@@ -123,7 +172,16 @@ export function LoginPage() {
     googleReady,
   } = useAuth()
   const navigate = useNavigate()
-  const [carousel, setCarousel] = useState(0)
+  const [carousel, setCarousel] = useState(1)
+  const [paused, setPaused] = useState(false)
+
+  useEffect(() => {
+    if (paused) return
+    const id = window.setInterval(() => {
+      setCarousel((c) => (c + 1) % FEATURE_CARDS.length)
+    }, 3200)
+    return () => window.clearInterval(id)
+  }, [paused])
 
   const routeAfterSession = (onboarded: boolean, hasShop: boolean) => {
     if (!onboarded || !hasShop) navigate('/onboarding')
@@ -174,59 +232,91 @@ export function LoginPage() {
             Simple Tools for a <span className="text-[#9ec5ff]">Smarter Business</span>
           </h2>
 
-          <div className="relative mt-10 flex w-full items-end justify-center gap-3.5 px-1">
-            {FEATURE_ICONS.map((item, index) => {
-              const Icon = item.icon
-              const active = index === carousel
-              const tilt =
-                index === 0 ? (active ? -7 : -9) : index === 2 ? (active ? 7 : 9) : 0
-              return (
-                <div
-                  key={item.key}
-                  className="origin-bottom"
-                  style={{ transform: `rotate(${tilt}deg)` }}
-                >
+          <div
+            className="relative mt-10 h-[168px] w-full max-w-[340px]"
+            style={{ perspective: 1000 }}
+            onPointerDown={() => setPaused(true)}
+            onPointerUp={() => setPaused(false)}
+            onMouseEnter={() => setPaused(true)}
+            onMouseLeave={() => setPaused(false)}
+          >
+            <div className="absolute inset-0" style={{ transformStyle: 'preserve-3d' }}>
+              {FEATURE_CARDS.map((item, index) => {
+                const Icon = item.icon
+                let offset = index - carousel
+                if (offset > 1) offset -= FEATURE_CARDS.length
+                if (offset < -1) offset += FEATURE_CARDS.length
+                const active = offset === 0
+                const target = cardMotion(offset)
+
+                return (
                   <motion.button
+                    key={item.key}
                     type="button"
                     onClick={() => setCarousel(index)}
-                    whileHover={{ y: -5 }}
-                    whileTap={{ scale: 0.97 }}
+                    initial={false}
+                    animate={target}
+                    transition={{
+                      type: 'spring',
+                      stiffness: 280,
+                      damping: 28,
+                      mass: 0.8,
+                    }}
+                    drag={active ? 'x' : false}
+                    dragConstraints={{ left: 0, right: 0 }}
+                    dragElastic={0.2}
+                    onDragEnd={(_, info) => {
+                      if (info.offset.x < -56 || info.velocity.x < -400) {
+                        setCarousel((c) => (c + 1) % FEATURE_CARDS.length)
+                      } else if (info.offset.x > 56 || info.velocity.x > 400) {
+                        setCarousel(
+                          (c) => (c - 1 + FEATURE_CARDS.length) % FEATURE_CARDS.length,
+                        )
+                      }
+                    }}
                     className={cn(
-                      'relative flex items-center justify-center overflow-hidden rounded-[24px] border border-white/90 bg-white transition-all duration-300',
+                      'absolute left-1/2 top-1/2 ml-[-64px] mt-[-78px] flex w-[128px] cursor-grab flex-col items-center gap-2.5 rounded-[26px] border border-white/95 bg-white px-3 py-4 active:cursor-grabbing',
                       active
-                        ? 'z-10 mb-1 h-[96px] w-[100px] shadow-[0_18px_40px_rgba(0,40,120,0.28),inset_0_1px_0_rgba(255,255,255,0.95)]'
-                        : 'mb-0 h-[80px] w-[82px] opacity-90 shadow-[0_12px_28px_rgba(0,40,120,0.18)]',
+                        ? 'shadow-[0_22px_50px_rgba(0,40,120,0.32),inset_0_1px_0_rgba(255,255,255,0.95)]'
+                        : 'shadow-[0_14px_32px_rgba(0,40,120,0.18)]',
                     )}
-                    aria-label={item.key}
+                    style={{ transformStyle: 'preserve-3d' }}
+                    aria-label={item.label}
                   >
-                    <span className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_30%_18%,rgba(0,100,240,0.14),transparent_58%)]" />
-                    <span className="pointer-events-none absolute -bottom-7 left-1/2 h-16 w-16 -translate-x-1/2 rounded-full bg-[#0064f0]/15 blur-2xl" />
+                    <span className="pointer-events-none absolute inset-0 rounded-[26px] bg-[radial-gradient(circle_at_30%_15%,rgba(0,100,240,0.12),transparent_55%)]" />
                     <span
                       className={cn(
-                        'relative flex items-center justify-center rounded-2xl bg-gradient-to-b from-[#eef5ff] via-white to-[#f8fbff] shadow-[0_6px_16px_rgba(0,100,240,0.14)] ring-1 ring-[#0064f0]/12',
-                        active ? 'h-[56px] w-[56px]' : 'h-12 w-12',
+                        'relative flex items-center justify-center rounded-[18px] bg-gradient-to-b from-[#eef5ff] to-white shadow-[0_6px_14px_rgba(0,100,240,0.12)] ring-1 ring-[#0064f0]/12',
+                        active ? 'h-[58px] w-[58px]' : 'h-[50px] w-[50px]',
                       )}
                     >
                       <Icon className={active ? 'h-8 w-8' : 'h-7 w-7'} />
                     </span>
+                    <span
+                      className={cn(
+                        'relative whitespace-nowrap font-display font-semibold leading-tight text-[#0f172a]',
+                        active ? 'text-[12px]' : 'text-[11px]',
+                      )}
+                    >
+                      {item.label}
+                    </span>
                   </motion.button>
-                </div>
-              )
-            })}
+                )
+              })}
+            </div>
           </div>
 
-          <div className="mt-5 flex items-center justify-center gap-2">
-            {FEATURE_ICONS.map((item, index) => (
+          <div className="mt-4 flex items-center justify-center gap-2">
+            {FEATURE_CARDS.map((item, index) => (
               <button
                 key={item.key}
                 type="button"
-                aria-label={`Slide ${index + 1}`}
+                aria-label={`Show ${item.label}`}
                 onClick={() => setCarousel(index)}
-                className={
-                  index === carousel
-                    ? 'h-2 w-2 rounded-full bg-white'
-                    : 'h-2 w-2 rounded-full bg-white/40'
-                }
+                className={cn(
+                  'h-2 rounded-full transition-all duration-300',
+                  index === carousel ? 'w-5 bg-white' : 'w-2 bg-white/40 hover:bg-white/60',
+                )}
               />
             ))}
           </div>
@@ -305,19 +395,7 @@ export function LoginPage() {
             </span>
           </Button>
 
-          <p className="mt-7 text-center text-sm text-slate-500">
-            New to Paylo?{' '}
-            <button
-              type="button"
-              className="font-semibold text-[#0064f0] hover:underline disabled:opacity-50"
-              disabled={!googleReady || authBusy}
-              onClick={() => void handleGoogle('signup')}
-            >
-              Create your shop →
-            </button>
-          </p>
-
-          <p className="mt-6 text-center text-[12px] text-slate-400">
+          <p className="mt-8 text-center text-[12px] text-slate-400">
             Shops grow better with Paylo
           </p>
 
